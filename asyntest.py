@@ -6,6 +6,8 @@
 
 # Free RAM after reset 101504 bytes. Free RAM while running 82944 bytes
 # Usage 18560 bytes i.e. ~18.1KiB
+# This compares with 5312 bytes for a similar script sending plain text.
+# The MessagePack overhead is thus 13,248 bytes (12.9KiB).
 
 import uasyncio as asyncio
 import umsgpack

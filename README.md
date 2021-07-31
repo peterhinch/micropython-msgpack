@@ -23,10 +23,10 @@ with open('data', 'rb') as f:
     z = umsgpack.load(f)
 print(z)  # z might be a wide range of Python objects
 ```
-Where the protocol is extended it is still self describing. If the extension
-module is available to the receiver, code as above will work. For example the
-following might retrieve a `dict` containing, amongst other data, a `tuple` of
-`complex` values:
+The protocol maintains its self describing characteristic even when extended.
+If the extension module is available to the receiver, code as above will work.
+For example the following might retrieve a `dict` containing, amongst other
+data, a `tuple` of `complex` values:
 ```python
 import umsgpack
 import umsgpack_ext  # Extension module can encode tuple, set and complex
@@ -41,7 +41,7 @@ of useful information for those wishing to understand the protocol.
 
 The following types are natively supported.
  * `int` In range `-2**63` to `2**64 - 1`.
- * `bool`
+ * `bool` `True` or `False`.
  * `None`
  * `str` Unicode string.
  * `bytes` Binary data.
@@ -52,7 +52,7 @@ The following types are natively supported.
  * `dict` Termed "map" in MessagePack docs.
 
 The `list` and `dict` types may contain any supported type including `list` and
-`dict` instances.
+`dict` instances (ad nauseam).
 
 ## 1.2 Performance
 
@@ -67,8 +67,8 @@ lm = len(umsgpack.dumps(obj, force_float_precision = "single"))
 print(lj, lm, lj/lm)
 ```
 Outcome: `lj` == 106 bytes, `lm` == 41 bytes corresponding to a transmission
-speedup factor of 2.6. The `force_float_precision` arg ensures the same result
-on 32 bit and 64 bit platforms.
+speedup factor of 2.6. The `force_float_precision` option ensures the same
+result on 32 bit and 64 bit platforms.
 
 If large quantities of text are to be transmitted, a greater gain could be
 achieved by compressing the text with a `gzip` style compressor and serialising
@@ -84,9 +84,11 @@ This version was adapted from that codebase and optimised to minimise RAM usage
 when run on microcontrollers. Consumption is about 12KiB measured on STM32.
 
 This version is a subset of the original with support for features alien to
-MicroPython removed. The principal example is that of timestamps which do not
-exist in MicroPython. Python 2 support is removed. The code will run under
-Python 3 but in practice there is little reason to do so.
+MicroPython removed. The principal example is that of timestamps. MicroPython
+does not support the `datetime` module; further, timestamps seem a complication
+too far for microcontroller use. It is simple to send the integer result from
+`time.time()` or even `time.time_ns()`. Python 2 support is removed. The code
+will run under Python 3 but in practice there is little reason to do so.
 
 Supported types are fully compliant with a subset of the latest
 [MessagePack specification](https://github.com/msgpack/msgpack/blob/master/spec.md).
@@ -131,7 +133,7 @@ $ python3 test_umsgpack.py
 
 # 4. API
 
-In applications using `ujson`, MessagePack provides a dop-in replacement with
+In applications using `ujson`, MessagePack provides a drop-in replacement with
 the same API. The human readable (but large) strings are replaced by compact
 binary `bytes` objects.
 
@@ -166,7 +168,7 @@ arg.
 `dump` and `dumps` support the following options as keyword args:  
 
  1. `ext_handlers` (dict): dictionary of Ext handlers, mapping a custom type
- to a callable that packs an instance of the type into an Ext object
+ to a callable that packs an instance of the type into an Ext object.
  2. `force_float_precision` (str): `"single"` to force packing floats as
  IEEE-754 single-precision floats, `"double"` to force packing floats as
  IEEE-754 double-precision floats. By default the precision of the target's
@@ -195,9 +197,138 @@ print(z)  # z is complex
 A type supported by `umsgpack_ext` is serialised using `mpext(obj)` which
 returns an instance of a serialisable extension class.
 
+## 5.1 The ext_serializable decorator
+
+This provides a simple way of extending MessagePack to include additional
+types, and is used by `umsgpack_ext`. The following example, taken from that
+file, adds `complex` support:
+```python
+@umsgpack.ext_serializable(0x50)
+class Complex:
+    def __init__(self, c):
+        self.c = c
+
+    def __str__(self):
+        return "Complex({})".format(self.c)
+
+    def packb(self):
+        return struct.pack("ff", self.c.real, self.c.imag)
+
+    @staticmethod
+    def unpackb(data):
+        return complex(*struct.unpack("ff", data))
+```
+A class defined with the decorator must provide the following methods:
+ * Constructor: stores the object to be serialised.
+ * `packb` This returns a `bytes` instance containing the serialised object.
+ * `unpackb` Defined as a static method, this accepts a `bytes` instance of
+ packed data and returns a new instance of the unpacked data type.
+
+Typically this packing and unpacking is done using the `struct` module, but in
+the trivial cases of `tuple` and `set` it is done by umsgpack itself.
+
 # 6. Asynchronous use
 
-TODO
+Serialisation presents no problem in asynchronous code. The following example
+serialises the data using the normal synchronous `dumps` method then sends it
+asynchronously:
+```python
+async def sender():
+    swriter = asyncio.StreamWriter(uart, {})
+    obj = [1, 2, 3.14159]
+    while True:
+        s = umsgpack.dumps(obj)  # Synchronous serialisation
+        swriter.write(s)
+        await swriter.drain()  # Asynchonous transmission
+        await asyncio.sleep(5)
+        obj[0] += 1
+```
+Reception is potentially difficult. In the case of ASCII protocols like JSON
+and Pickle it is possible to append a `b'\n'` delimiter to each message, then
+use `StreamReader.readline()` to perform an asynchronous read of an entire
+message. This works because the messages themselves cannot contain that
+character. MessagePack is a binary protocol - the data may include all
+possible byte values so a unique delimiter is unavailable.
+
+MessagePack messages are binary sequences whose length is unknown to the
+receiver. Further, a substantial amount of the message must be read before the
+total length can be deduced. The solution adopted is to add an `aload()` method
+that accepts data from a `StreamReader` and decodes it as it arrives. The
+following is an example of an asynchronous reader:
+```python
+async def receiver():
+    sreader = asyncio.StreamReader(uart)
+    while True:
+        res = await umsgpack.aload(sreader)
+        print('Recieved', res)
+```
+The demo `asyntest.py` runs on a Pyboard with pins X1 and X2 linked. The code
+includes notes regarding RAM overhead.
+
+# 7. Ext Handlers
+
+This is an alternative to the `ext_serializable` decorator and provides another
+option for extending MessagePack. In my view it is rather clunky and I find it
+hard to envisage a use case. It is included for completeness.
+
+The packing functions accept an optional `ext_handlers` dictionary that maps
+custom types to callables that pack the type into an Ext object. The callable
+should accept the custom type object as an argument and return a packed
+`umsgpack.Ext` object.
+
+Example for packing `set` and `complex` types into Ext objects with type codes
+0x20 and 0x30:
+
+```python
+umsgpack.dumps([1, True, {"foo", 2}, complex(3, 4)],
+    ext_handlers = {
+       set: lambda obj: umsgpack.Ext(0x20, umsgpack.dumps(list(obj))),
+       complex: lambda obj: umsgpack.Ext(0x30, struct.pack("ff", obj.real, obj.imag))
+       })
+```
+
+Similarly, the unpacking functions accept an optional `ext_handlers` dictionary
+that maps Ext type codes to callables that unpack the Ext into a custom object.
+The callable should accept a `umsgpack.Ext` object as an argument and return an
+unpacked custom type object.
+
+Example for unpacking Ext objects with type codes 0x20, and 0x30 into `set` and
+`complex` objects:
+
+``` python
+umsgpack.loads(s,
+    ext_handlers = {
+      0x20: lambda ext: set(umsgpack.loads(ext.data)),
+      0x30: lambda ext: complex(*struct.unpack("ff", ext.data)),
+    })
+```
+
+Example for packing and unpacking a custom class:
+
+``` python
+class Point(object):
+    def __init__(self, x, y, z):
+        self.x = x
+        self.y = y
+        self.z = z
+
+    def __str__(self):
+        return "Point({}, {}, {})".format(self.x, self.y, self.z)
+
+    def pack(self):
+        return struct.pack(">iii", self.x, self.y, self.z)
+
+    @staticmethod
+    def unpack(data):
+        return Point(*struct.unpack(">iii", data))
+
+# Pack
+obj = Point(1,2,3)
+data = umsgpack.dumps(obj, ext_handlers = {Point: lambda obj: umsgpack.Ext(0x10, obj.pack())})
+
+# Unpack
+obj = umsgpack.loads(data, ext_handlers = {0x10: lambda ext: Point.unpack(ext.data)})
+```
 
 # N. Changes for MicroPython
 

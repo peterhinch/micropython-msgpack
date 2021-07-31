@@ -1,3 +1,14 @@
+# umsgpack_ext.py Demo of extending MessagePack to support additional Python
+# built-in types.
+
+# Copyright (c) 2021 Peter Hinch Released under the MIT License see LICENSE
+
+# Each built-in type has a class defined with the umsgpack.ext_serializable
+# decorator and assigned a unique integer in range 0-127.
+# The mpext method accepts an instance of a supported class and returns an
+# instance of the appropriate ext_serializable class.
+# User defined classes could readily be included.
+
 import umsgpack
 import struct
 
