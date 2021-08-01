@@ -98,8 +98,7 @@ timestamps. MicroPython does not support the `datetime` module. There are also
 issues with platforms differing in their time handling, notably the epoch. On a
 microcontroller it is simple to send the integer result from `time.time()` or
 even `time.time_ns()`. Python 2 support is removed. The code will run under
-Python 3. In practice there is little reason to do so when the original works
-perfectly well on a PC.
+Python 3.
 
 Supported types are fully compliant with a subset of the latest
 [MessagePack specification](https://github.com/msgpack/msgpack/blob/master/spec.md).
