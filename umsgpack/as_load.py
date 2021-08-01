@@ -11,6 +11,10 @@ import collections
 import io
 from uasyncio import StreamReader
 from . import *
+try:
+    from . import umsgpack_ext
+except ImportError:
+    pass
 
 
 async def _re0(s, fp, n):

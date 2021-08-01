@@ -1,0 +1,5 @@
+#! /bin/bash
+
+mv umsgpack/umsgpack_ext.py umsgpack/umsgpack_ext.tmp
+python3 test_umsgpack.py
+mv umsgpack/umsgpack_ext.tmp umsgpack/umsgpack_ext.py

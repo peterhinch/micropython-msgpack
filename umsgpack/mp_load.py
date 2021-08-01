@@ -11,6 +11,10 @@ import struct
 import collections
 import io
 from . import *
+try:
+    from . import umsgpack_ext
+except ImportError:
+    pass
 
 def _fail():  # Debug code should never be called.
     raise Exception('Logic error')

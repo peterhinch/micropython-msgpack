@@ -1,11 +1,13 @@
-# This doc is incomplete and under development.
-
-# 1. MessagePack Introduction
+# 1. MicroPython MessagePack Introduction
 
 [MessagePack](http://msgpack.org/) is a serialization protocol similar to JSON.
 Where JSON produces human readable strings, MessagePack produces binary `bytes`
-data. The protocol achieves a substantial reduction in data volume. This
-MicroPython implementation has usage identical to that of the `ujson` library:
+data. The protocol achieves a substantial reduction in data volume. Its
+combination of ease of use, extensibility, and packing performance makes it
+worth considering in any application where data volume is an issue.
+
+This MicroPython implementation has usage identical to that of the `ujson`
+library:
 ```python
 import umsgpack
 obj = [1, 2, 3.14159]
@@ -23,36 +25,46 @@ with open('data', 'rb') as f:
     z = umsgpack.load(f)
 print(z)  # z might be a wide range of Python objects
 ```
-The protocol maintains its self describing characteristic even when extended.
-If the extension module is available to the receiver, code as above will work.
-For example the following might retrieve a `dict` containing, amongst other
-data, a `tuple` of `complex` values:
+The protocol is self describing even when extended. If the extension module is
+available to the receiver, code as above will work. For example the following
+might retrieve a `dict` containing, amongst other data, a `tuple` of `complex`
+values. It will work so long as the `umsgpack` directory on the target includes
+the file `umsgpack_ext.py`.
 ```python
-import umsgpack
-import umsgpack_ext  # Extension module can encode tuple, set and complex
+import umsgpack # Extension module can encode tuple, set and complex
 with open('data', 'rb') as f:
     z = umsgpack.load(f)
 ```
-This document focuses on usage with MicroPython. The
+This document focuses on usage with MicroPython and skips most of the detail on
+how MessagePack works. The
 [source document](https://github.com/vsergeev/u-msgpack-python) provides a lot
-of useful information for those wishing to understand the protocol.
+of useful information for those wishing to understand the protocol. Also see
+[the MessagePack spec](https://github.com/msgpack/msgpack/blob/master/spec.md).
 
 ## 1.1 Supported types
 
 The following types are natively supported.
  * `int` In range `-2**63` to `2**64 - 1`.
- * `bool` `True` or `False`.
- * `None`
+ * `True`, `False` and `None`.
  * `str` Unicode string.
  * `bytes` Binary data.
  * `float` IEEE-754 single or double precision controlled by a dump option.
  * `tuple` By default tuples are de-serialised as lists, but this can be
- overridden by a load option.
+ overridden by a load option. The extension module provides proper support.
  * `list` Termed "array" in MessagePack documentation.
  * `dict` Termed "map" in MessagePack docs.
 
 The `list` and `dict` types may contain any supported type including `list` and
 `dict` instances (ad nauseam).
+
+The file `umsgpack_ext.py` (in `umsgpack` directory) extends this to add the
+following:
+ * `tuple` Provides an explicit distinction between `tuple` and `list` types:
+ if it is encoded as a `tuple` it will be decoded as one.
+ * `complex`
+ * `set`
+
+
 
 ## 1.2 Performance
 
@@ -83,12 +95,13 @@ under Python 2 and Python 3. With trivial adaptations it will run under
 This version was adapted from that codebase and optimised to minimise RAM usage
 when run on microcontrollers. Consumption is about 12KiB measured on STM32.
 
-This version is a subset of the original with support for features alien to
-MicroPython removed. The principal example is that of timestamps. MicroPython
-does not support the `datetime` module; further, timestamps seem a complication
-too far for microcontroller use. It is simple to send the integer result from
-`time.time()` or even `time.time_ns()`. Python 2 support is removed. The code
-will run under Python 3 but in practice there is little reason to do so.
+This version is a subset of the original. Support was removed for features
+thought unnecessary for microcontroller use. The principal example is that of
+timestamps. MicroPython does not support the `datetime` module. On a
+microcontroller it is simple to send the integer result from `time.time()` or
+even `time.time_ns()`. Python 2 support is removed. The code will run under
+Python 3. In practice there is little reason to do so when the original works
+perfectly well on a PC.
 
 Supported types are fully compliant with a subset of the latest
 [MessagePack specification](https://github.com/msgpack/msgpack/blob/master/spec.md).
@@ -110,26 +123,17 @@ Clone the repo by moving to a directory on your PC and issuing
 ```bash
 $ git clone https://github.com/peterhinch/micropython-msgpack
 ```
-
 Copy the directory `umsgpack` and its contents to your target hardware.
 
-The file `umsgpack_ext.py` simplifies the extension of MessagePack to support
-extra Python native types. By default it supports `set`, `complex` and `tuple`
-objects but this can readily be extended. To use this, copy it to the target
-hardware.
+The following optional files may also be copied to the target:
+ * `user_class.py` A serialisable user class.
+ * `asyntest.py` Demo of asynchronous use. See [section 7](./README.md#7-asynchronous-use).
 
-The file `asyntest.py` demonstrates asynchronous use on a Pyboard. It can be
-adapted to support any target with a UART.
+The files `run_test_suite` and `test_umsgpack.py` comprise the test suite which
+runs on a PC. See [section 9](./README.md#9-test-suite).
 
-## 3.1 Test suite
-
-The repo includes the test suite `test_umsgpack.py` which must be run under
-Python 3. This is because it tests large data types: the test suite causes
-memory errors when compiled under even the Unix build of MicroPython. To run,
-move to the location of the the `umsgpack` directory on your PC and issue:
-```bash
-$ python3 test_umsgpack.py
-```
+If RAM usage is to be minimised, the file `umsgpack/umsgpack_ext.py` may be
+deleted from the target with loss of its additional type support.
 
 # 4. API
 
@@ -145,18 +149,20 @@ The API supports the following methods:
  object.
  4. `load(fp, **options)` Unpack data from a stream or file.
  5. `aload(fp, **options)` Asynchronous unpack of data from a `StreamReader`.
+ See [section 7](./README.md#7-asynchronous-use).
 
 ## 4.1 Load options
 
 `load`, `loads` and `aload` support the following options as keyword args:  
- 1. `ext_handlers` a dictionary of Ext handlers, mapping integer Ext type to a
- callable that unpacks an instance of Ext into an object.
- 2. `allow_invalid_utf8` (bool): unpack invalid strings into bytes (default
+ 1. `allow_invalid_utf8` (bool): unpack invalid strings into bytes (default
  `False` which causes an exception to be raised).
- 3. `use_ordered_dict` (bool): unpack dicts into `OrderedDict`, instead of
+ 2. `use_ordered_dict` (bool): unpack dicts into `OrderedDict`, instead of
  `dict`. (default `False`).
- 4. `use_tuple` (bool): unpacks arrays into tuples, instead of lists (default
- `False`).
+ 3. `use_tuple` (bool): unpacks arrays into tuples, instead of lists (default
+ `False`). The extension module (if used) makes this redundant.
+ 4. `ext_handlers` a dictionary of Ext handlers, mapping integer Ext type to a
+ callable that unpacks an instance of Ext into an object. See
+ [section 8](./README.md#8-ext-handlers).
 
 Work is in progress to make `dict` instances ordered by default, so option 3
 may become pointless. The `umsgpack_ext` module enables tuples to be encoded in
@@ -167,56 +173,73 @@ arg.
 
 `dump` and `dumps` support the following options as keyword args:  
 
- 1. `ext_handlers` (dict): dictionary of Ext handlers, mapping a custom type
- to a callable that packs an instance of the type into an Ext object.
- 2. `force_float_precision` (str): `"single"` to force packing floats as
+ 1. `force_float_precision` (str): `"single"` to force packing floats as
  IEEE-754 single-precision floats, `"double"` to force packing floats as
  IEEE-754 double-precision floats. By default the precision of the target's
  firmware is detected and used.
+ 2. `ext_handlers` (dict): dictionary of Ext handlers, mapping a custom type
+ to a callable that packs an instance of the type into an Ext object. See
+ [section 8](./README.md#8-ext-handlers).
 
 # 5. Extension module
 
-The `umsgpack_ext` module simplifies the extension of `umsgpack` to support
-additional Python built-in types or types supported by other libraries. By
-default it supports `complex`, `set` and `tuple` types but it can readily
-be extended to support further types. The following examples may be pasted at
-the REPL:
+The `umsgpack_ext` module extends `umsgpack` to support `complex`, `set` and
+`tuple` types, but its design facilitates adding further Python built-in types
+or types supported by other libraries. Support is entirely transparent to the
+application: the added types behave in the same way as native types.
+
+The following examples may be pasted at the REPL:
 ```python
 import umsgpack
-from umsgpack_ext import mpext
 with open('data', 'wb') as f:
-   umsgpack.dump(mpext(1 + 4j), f)  # mpext() handles extension type
+   umsgpack.dump(1 + 4j, f)  # mpext() handles extension type
 ```
 Reading back:
 ```python
-import umsgpack, umsgpack_ext
+import umsgpack
 with open('data', 'rb') as f:
     z = umsgpack.load(f)
 print(z)  # z is complex
 ```
-A type supported by `umsgpack_ext` is serialised using `mpext(obj)` which
-returns an instance of a serialisable extension class.
+ The file `umsgpack_ext.py` may be found in the `umsgpack` directory. To extend
+ it to support additional types, see
+[section 11](./README.md#11-notes-on-the-extension-module).
 
-## 5.1 The ext_serializable decorator
+# 6. Serialisable user classes
+
+An example of a serialisable user class may be found in `user_class.py`. It
+provides a `Point3d` class representing a point in 3D space stored as three
+`float` values. It may be run as follows (paste at the REPL):
+```python
+import umsgpack
+from user_class import Point3d
+p = Point3d(1.0, 2.1, 3)
+s = umsgpack.dumps(p)
+print(umsgpack.loads(s))
+```
+
+## 6.1 The ext_serializable decorator
 
 This provides a simple way of extending MessagePack to include additional
-types, and is used by `umsgpack_ext`. The following example, taken from that
-file, adds `complex` support:
+types. The following is the contents of `user_class.py`:
 ```python
-@umsgpack.ext_serializable(0x50)
-class Complex:
-    def __init__(self, c):
-        self.c = c
+import umsgpack
+import struct
+
+@umsgpack.ext_serializable(0x10)
+class Point3d:
+    def __init__(self, x, y, z):
+        self.v = (float(x), float(y), float(z))
 
     def __str__(self):
-        return "Complex({})".format(self.c)
+        return "Point3d({} {} {})".format(*self.v)
 
     def packb(self):
-        return struct.pack("ff", self.c.real, self.c.imag)
+        return struct.pack("fff", *self.v)
 
     @staticmethod
     def unpackb(data):
-        return complex(*struct.unpack("ff", data))
+        return Point3d(*struct.unpack("fff", data))
 ```
 A class defined with the decorator must provide the following methods:
  * Constructor: stores the object to be serialised.
@@ -225,9 +248,11 @@ A class defined with the decorator must provide the following methods:
  packed data and returns a new instance of the unpacked data type.
 
 Typically this packing and unpacking is done using the `struct` module, but in
-the trivial cases of `tuple` and `set` it is done by umsgpack itself.
+the some simple cases it may be done by umsgpack itself.
 
-# 6. Asynchronous use
+# 7. Asynchronous use
+
+## 7.1 Serialisation
 
 Serialisation presents no problem in asynchronous code. The following example
 serialises the data using the normal synchronous `dumps` method then sends it
@@ -243,18 +268,21 @@ async def sender():
         await asyncio.sleep(5)
         obj[0] += 1
 ```
-Reception is potentially difficult. In the case of ASCII protocols like JSON
-and Pickle it is possible to append a `b'\n'` delimiter to each message, then
-use `StreamReader.readline()` to perform an asynchronous read of an entire
-message. This works because the messages themselves cannot contain that
-character. MessagePack is a binary protocol - the data may include all
-possible byte values so a unique delimiter is unavailable.
+
+## 7.2 De-serialisation
+
+This is potentially difficult. In the case of ASCII protocols like JSON and
+Pickle it is possible to append a `b'\n'` delimiter to each message, then use
+`StreamReader.readline()` to perform an asynchronous read of an entire message.
+This works because the messages themselves cannot contain that character.
+MessagePack is a binary protocol so the data may include all possible byte
+values. Consequently a unique delimiter is unavailable.
 
 MessagePack messages are binary sequences whose length is unknown to the
-receiver. Further, a substantial amount of the message must be read before the
-total length can be deduced. The solution adopted is to add an `aload()` method
-that accepts data from a `StreamReader` and decodes it as it arrives. The
-following is an example of an asynchronous reader:
+receiver. Further, in many case a substantial amount of the message must be
+read before the total length can be deduced. The solution adopted is to add an
+`aload()` method that accepts data from a `StreamReader`, decoding it as it
+arrives. The following is an example of an asynchronous reader:
 ```python
 async def receiver():
     sreader = asyncio.StreamReader(uart)
@@ -265,11 +293,11 @@ async def receiver():
 The demo `asyntest.py` runs on a Pyboard with pins X1 and X2 linked. The code
 includes notes regarding RAM overhead.
 
-# 7. Ext Handlers
+# 8. Ext Handlers
 
 This is an alternative to the `ext_serializable` decorator and provides another
-option for extending MessagePack. In my view it is rather clunky and I find it
-hard to envisage a use case. It is included for completeness.
+option for extending MessagePack. In my view it is rather clunky and I struggle
+to envisage a use case. It is included for completeness.
 
 The packing functions accept an optional `ext_handlers` dictionary that maps
 custom types to callables that pack the type into an Ext object. The callable
@@ -329,8 +357,52 @@ data = umsgpack.dumps(obj, ext_handlers = {Point: lambda obj: umsgpack.Ext(0x10,
 # Unpack
 obj = umsgpack.loads(data, ext_handlers = {0x10: lambda ext: Point.unpack(ext.data)})
 ```
+# 9. Exceptions
 
-# N. Changes for MicroPython
+These are defined in `umsgpack/__init__.py`.
+
+The `dump` and `dumps` methods can throw the following:
+```python
+# Packing error
+class UnsupportedTypeException(PackException):
+    "Object type not supported for packing."
+```
+The `load` and `loads` methods can throw the following. In practice these are
+only likely to occur if data has been corrupted, for example if transmitted via
+an unreliable medium:
+```python
+class InsufficientDataException(UnpackException):
+    "Insufficient data to unpack the serialized object."
+
+class InvalidStringException(UnpackException):
+    "Invalid UTF-8 string encountered during unpacking."
+
+class ReservedCodeException(UnpackException):
+    "Reserved code encountered during unpacking."
+
+class UnhashableKeyException(UnpackException):
+    """
+    Unhashable key encountered during map unpacking.
+    The serialized map cannot be deserialized into a Python dictionary.
+    """
+
+class DuplicateKeyException(UnpackException):
+    "Duplicate key encountered during map unpacking."
+```
+
+# 10. Test suite
+
+This is mainly of interest to those wanting to modify the code.
+
+The repo includes the test suite `test_umsgpack.py` which must be run under
+Python 3 in a directory containing the `umsgpack` tree. It will not run under
+MicroPython because it tests large data types: the test suite causes memory
+errors when compiled under even the Unix build of MicroPython. The file
+`umsgpack_ext.py` should not be present: this is because the test suite assumes
+that `complex` and `set` are not supported. The script `run_test_suite` renames
+`umsgpack_ext.py`, runs the tests and restores the file. 
+
+# 11. Changes for MicroPython
 
 Code in this repo is based on
 [this implementation](https://github.com/vsergeev/u-msgpack-python), whose code
@@ -355,6 +427,24 @@ Further refactoring to reduce allocations.
 Method of detecting platform's float size changed (MicroPython does not support
 the original method).  
 Version reset to (0.1.0).
+
+# 11. Notes on the extension module
+
+These notes are for thos wishing to understand how this works, perhaps to add
+support for further types.
+
+The `mp_dump.py` attempts to load a function `mpext` from the module. If this
+fails (becuase the module is missing) it creates a dummy function. When the
+`dump` method runs, it executes `mpext` passing the object to be encoded. If
+the type of the object matches one support by the extension, it returns an
+instance of a serialisable class created with the passed object. If the type
+does not match, the passed object is returned for `dump` to inspect.
+
+Supporting additional types therefore comprises the following:
+ 1. Create an `ext_serializable` class for the new type as per
+ [section 6.1](./README.md#61-the-ext_serializable-decorator).
+ 2. Change the function `mpext` to check for the new type and, if found, return
+ an instance of the above class.
 
 ## License
 

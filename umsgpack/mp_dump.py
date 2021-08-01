@@ -9,6 +9,11 @@
 import struct
 import collections
 import io
+try:
+    from .umsgpack_ext import mpext
+except ImportError:
+    mpext = lambda x : x
+
 from . import *
 
 # Auto-detect system float precision
@@ -168,6 +173,8 @@ def _utype(obj):
 
 # Pack with unicode 'str' type, 'bytes' type
 def dump(obj, fp, options):
+    # return packable object if supported in umsgpack_ext, else return obj
+    obj = mpext(obj)  
     ext_handlers = options.get("ext_handlers")
 
     if obj is None:

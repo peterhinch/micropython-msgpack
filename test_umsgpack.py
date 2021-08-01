@@ -171,7 +171,7 @@ composite_test_vectors = [
 ]
 
 pack_exception_test_vectors = [
-    # Unsupported type exception
+    # Unsupported type exception.
     ["unsupported type", set([1, 2, 3]), umsgpack.UnsupportedTypeException],
     ["unsupported type", -2**(64 - 1) - 1, umsgpack.UnsupportedTypeException],
     ["unsupported type", 2**64, umsgpack.UnsupportedTypeException],

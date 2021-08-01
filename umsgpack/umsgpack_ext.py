@@ -1,17 +1,19 @@
 # umsgpack_ext.py Demo of extending MessagePack to support additional Python
 # built-in types.
 
-# Copyright (c) 2021 Peter Hinch Released under the MIT License see LICENSE
+# Copyright (c) 2021 Peter Hinch Released under the MIT License see LICENSE.
 
 # Each built-in type has a class defined with the umsgpack.ext_serializable
 # decorator and assigned a unique integer in range 0-127.
 # The mpext method accepts an instance of a supported class and returns an
 # instance of the appropriate ext_serializable class.
-# User defined classes could readily be included.
 
 import umsgpack
 import struct
 
+# Entries in mpext are required where types are to be handled without declaring
+# an ext_serializable class in the application. This example enables complex,
+# tuple and set types to be packed as if they were native to umsgpack.
 def mpext(obj):
     if isinstance(obj, complex):
         return Complex(obj)
@@ -19,7 +21,7 @@ def mpext(obj):
         return Set(obj)
     if isinstance(obj, tuple):
         return Tuple(obj)
-    raise umsgpack.UnsupportedTypeException("unsupported type: {:s}".format(str(type(obj))))
+    return obj
 
 @umsgpack.ext_serializable(0x50)
 class Complex:
@@ -44,7 +46,7 @@ class Set:
     def __str__(self):
         return "Set({})".format(self.s)
 
-    def packb(self):
+    def packb(self):  # Must change to list otherwise get infinite recursion
         return umsgpack.dumps(list(self.s))
 
     @staticmethod
@@ -60,7 +62,7 @@ class Tuple:
         return "Tuple({})".format(self.s)
 
     def packb(self):
-        return umsgpack.dumps(self.s)
+        return umsgpack.dumps(list(self.s))  # Infinite recursion
 
     @staticmethod
     def unpackb(data):
