@@ -3,8 +3,9 @@
 
 # Copyright (c) 2021 Peter Hinch Released under the MIT License see LICENSE.
 
-# Each built-in type has a class defined with the umsgpack.ext_serializable
-# decorator and assigned a unique integer in range 0-127.
+# Each supported type has a class defined with the umsgpack.ext_serializable
+# decorator and assigned a unique integer in range 0-127. I arbitrarily chose
+# a range starting at 0x50.
 # The mpext method accepts an instance of a supported class and returns an
 # instance of the appropriate ext_serializable class.
 
@@ -32,11 +33,11 @@ class Complex:
         return "Complex({})".format(self.c)
 
     def packb(self):
-        return struct.pack("ff", self.c.real, self.c.imag)
+        return struct.pack(">ff", self.c.real, self.c.imag)
 
     @staticmethod
     def unpackb(data):
-        return complex(*struct.unpack("ff", data))
+        return complex(*struct.unpack(">ff", data))
 
 @umsgpack.ext_serializable(0x51)
 class Set:

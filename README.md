@@ -25,16 +25,12 @@ with open('data', 'rb') as f:
     z = umsgpack.load(f)
 print(z)  # z might be a wide range of Python objects
 ```
-The protocol is self describing even when extended. If the extension module is
-available to the receiver, code as above will work. For example the following
-might retrieve a `dict` containing, amongst other data, a `tuple` of `complex`
-values. It will work so long as the `umsgpack` directory on the target includes
-the file `umsgpack_ext.py`.
-```python
-import umsgpack # Extension module can encode tuple, set and complex
-with open('data', 'rb') as f:
-    z = umsgpack.load(f)
-```
+The protocol is self describing even when extended. The file
+`umsgpack/umsgpack_ext.py` extends support to `complex`, `tuple` and `set`
+built-in types. Provided that file exists on the target, the code above will
+work even if the data includes such objects. Extension can be provided in a way
+that is transparent to the application.
+
 This document focuses on usage with MicroPython and skips most of the detail on
 how MessagePack works. The
 [source document](https://github.com/vsergeev/u-msgpack-python) provides a lot
@@ -50,7 +46,8 @@ The following types are natively supported.
  * `bytes` Binary data.
  * `float` IEEE-754 single or double precision controlled by a dump option.
  * `tuple` By default tuples are de-serialised as lists, but this can be
- overridden by a load option. The extension module provides proper support.
+ overridden by a load option. The extension module provides proper support
+ wherby `list` and `tuple` objects unpack unchanged.
  * `list` Termed "array" in MessagePack documentation.
  * `dict` Termed "map" in MessagePack docs.
 
@@ -97,7 +94,8 @@ when run on microcontrollers. Consumption is about 12KiB measured on STM32.
 
 This version is a subset of the original. Support was removed for features
 thought unnecessary for microcontroller use. The principal example is that of
-timestamps. MicroPython does not support the `datetime` module. On a
+timestamps. MicroPython does not support the `datetime` module. There are also
+issues with platforms differing in their time handling, notably the epoch. On a
 microcontroller it is simple to send the integer result from `time.time()` or
 even `time.time_ns()`. Python 2 support is removed. The code will run under
 Python 3. In practice there is little reason to do so when the original works
@@ -108,9 +106,9 @@ Supported types are fully compliant with a subset of the latest
 In particular, it supports the new binary, UTF-8 string and application-defined
 ext types. As stated above, timestamps are unsupported.
 
-The repository includes `umsgpack_ext.py` which optionally extends the library
-to support Python `set`, `complex` and `tuple` objects. The aim is to show how
-this can easily be extended to include further types.
+The repository includes `umsgpack/umsgpack_ext.py` which optionally extends the
+library to support Python `set`, `complex` and `tuple` objects. The aim is to
+show how this can easily be extended to include further types.
 
 This MicroPython version uses various techniques to minimise RAM use including
 "lazy imports": a module is only imported on first usage. For example an
@@ -150,6 +148,10 @@ The API supports the following methods:
  4. `load(fp, **options)` Unpack data from a stream or file.
  5. `aload(fp, **options)` Asynchronous unpack of data from a `StreamReader`.
  See [section 7](./README.md#7-asynchronous-use).
+
+The options are discussed below. Most are rather specialised. I am unsure if
+there is a practical use case for `ext_handlers`: an easier way is to use
+[the ext_serializable decorator](./README.md#61-the-ext_serializable-decorator).
 
 ## 4.1 Load options
 
@@ -235,11 +237,11 @@ class Point3d:
         return "Point3d({} {} {})".format(*self.v)
 
     def packb(self):
-        return struct.pack("fff", *self.v)
+        return struct.pack(">fff", *self.v)
 
     @staticmethod
     def unpackb(data):
-        return Point3d(*struct.unpack("fff", data))
+        return Point3d(*struct.unpack(">fff", data))
 ```
 A class defined with the decorator must provide the following methods:
  * Constructor: stores the object to be serialised.
@@ -248,7 +250,24 @@ A class defined with the decorator must provide the following methods:
  packed data and returns a new instance of the unpacked data type.
 
 Typically this packing and unpacking is done using the `struct` module, but in
-the some simple cases it may be done by umsgpack itself.
+the some simple cases it may be done by umsgpack itself. The following, taken
+from the extension module, illustrates support for `complex`:
+```python
+@umsgpack.ext_serializable(0x50)
+class Complex:
+    def __init__(self, c):
+        self.c = c
+
+    def __str__(self):
+        return "Complex({})".format(self.c)
+
+    def packb(self):
+        return struct.pack(">ff", self.c.real, self.c.imag)
+
+    @staticmethod
+    def unpackb(data):
+        return complex(*struct.unpack(">ff", data))
+```
 
 # 7. Asynchronous use
 
@@ -428,9 +447,9 @@ Method of detecting platform's float size changed (MicroPython does not support
 the original method).  
 Version reset to (0.1.0).
 
-# 11. Notes on the extension module
+# 12. Notes on the extension module
 
-These notes are for thos wishing to understand how this works, perhaps to add
+These notes are for those wishing to understand how this works, perhaps to add
 support for further types.
 
 The `mp_dump.py` attempts to load a function `mpext` from the module. If this
@@ -448,4 +467,5 @@ Supporting additional types therefore comprises the following:
 
 ## License
 
-micropython-msgpack is MIT licensed. See the included `LICENSE` file for more details.
+micropython-msgpack is MIT licensed. See the included `LICENSE` file for more
+details.

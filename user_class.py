@@ -15,8 +15,8 @@ class Point3d:
         return "Point3d({} {} {})".format(*self.v)
 
     def packb(self):
-        return struct.pack("fff", *self.v)
+        return struct.pack(">fff", *self.v)
 
     @staticmethod
     def unpackb(data):
-        return Point3d(*struct.unpack("fff", data))
+        return Point3d(*struct.unpack(">fff", data))
