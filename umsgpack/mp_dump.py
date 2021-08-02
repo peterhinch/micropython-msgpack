@@ -12,7 +12,7 @@ import io
 try:
     from .umsgpack_ext import mpext
 except ImportError:
-    mpext = lambda x : x
+    mpext = lambda x, _ : x
 
 from . import *
 
@@ -174,7 +174,7 @@ def _utype(obj):
 # Pack with unicode 'str' type, 'bytes' type
 def dump(obj, fp, options):
     # return packable object if supported in umsgpack_ext, else return obj
-    obj = mpext(obj)  
+    obj = mpext(obj, options)  
     ext_handlers = options.get("ext_handlers")
 
     if obj is None:

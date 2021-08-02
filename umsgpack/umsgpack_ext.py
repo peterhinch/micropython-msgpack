@@ -15,7 +15,9 @@ import struct
 # Entries in mpext are required where types are to be handled without declaring
 # an ext_serializable class in the application. This example enables complex,
 # tuple and set types to be packed as if they were native to umsgpack.
-def mpext(obj):
+# Options (kwargs to dump and dumps) may be passed to constructor including new
+# type-specific options
+def mpext(obj, options):
     if isinstance(obj, complex):
         return Complex(obj)
     if isinstance(obj, set):
