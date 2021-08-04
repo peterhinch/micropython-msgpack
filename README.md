@@ -130,7 +130,8 @@ The files `run_test_suite` and `test_umsgpack.py` comprise the test suite which
 runs on a PC. See [section 9](./README.md#9-test-suite).
 
 If RAM usage is to be minimised, the file `umsgpack/umsgpack_ext.py` may be
-deleted from the target with loss of its additional type support.
+deleted from the target with loss of its additional type support. Its overhead
+is about 2KiB measured on a Pyboard with no frozen bytecode.
 
 # 4. API
 
