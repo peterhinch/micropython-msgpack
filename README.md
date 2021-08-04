@@ -91,6 +91,10 @@ under Python 2 and Python 3. With trivial adaptations it will run under
 [MicroPython](https://micropython.org/) but at a high cost in RAM consumption.
 This version was adapted from that codebase and optimised to minimise RAM usage
 when run on microcontrollers. Consumption is about 12KiB measured on STM32.
+Using frozen bytecode this reduces to about 3.5KiB. This was tested with the
+`asyntest.py` demo, comparing the free RAM with that available running a
+similar script which exchanges uncompressed data. The difference was taken to
+be the library overhead of running compression and asynchronous decompression.
 
 This version is a subset of the original. Support was removed for features
 thought unnecessary for microcontroller use. The principal example is that of
@@ -464,6 +468,22 @@ Supporting additional types therefore comprises the following:
  [section 6.1](./README.md#61-the-ext_serializable-decorator).
  2. Change the function `mpext` to check for the new type and, if found, return
  an instance of the above class.
+
+## Acknowledgements
+
+This project was inspired by
+[this forum thread](https://forum.micropython.org/viewtopic.php?f=15&t=10827)
+where user WZab performed an initial port of the source library. See also
+[this GitHub issue](https://github.com/micropython/micropython/issues/4241).
+
+## Summary of references
+
+MessagePack main site:  
+[MessagePack](http://msgpack.org/)  
+MessagePack spec:  
+[the MessagePack spec](https://github.com/msgpack/msgpack/blob/master/spec.md).  
+Code on which this repo is based:  
+[u-msgpack-python](https://github.com/vsergeev/u-msgpack-python).
 
 ## License
 
