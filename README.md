@@ -26,10 +26,10 @@ with open('data', 'rb') as f:
 print(z)  # z might be a wide range of Python objects
 ```
 The protocol is self describing even when extended. The file
-`umsgpack/umsgpack_ext.py` extends support to `complex`, `tuple` and `set`
-built-in types. Provided that file exists on the target, the code above will
-work even if the data includes such objects. Extension can be provided in a way
-that is transparent to the application.
+`umsgpack/umsgpack_ext.py` extends support to `complex`, `tuple`, `set` and
+`Pin` built-in types. Provided that file exists on the target, the code above
+will work even if the data includes such objects. Extension can be provided in
+a way that is transparent to the application.
 
 This document focuses on usage with MicroPython and skips most of the detail on
 how MessagePack works. The
@@ -60,6 +60,9 @@ following:
  if it is encoded as a `tuple` it will be decoded as one.
  * `complex`
  * `set`
+ * `Pin` Provides a mean for handling pin references. Pin configuration and
+ status is not stored/sent; physical pin is never initialized when information
+ is received.
 
 
 
@@ -110,8 +113,8 @@ In particular, it supports the new binary, UTF-8 string and application-defined
 ext types. As stated above, timestamps are unsupported.
 
 The repository includes `umsgpack/umsgpack_ext.py` which optionally extends the
-library to support Python `set`, `complex` and `tuple` objects. The aim is to
-show how this can easily be extended to include further types.
+library to support Python `set`, `complex`, `tuple` and `Pin` objects. The aim is
+to show how this can easily be extended to include further types.
 
 This MicroPython version uses various techniques to minimise RAM use including
 "lazy imports": a module is only imported on first usage. For example an
@@ -189,10 +192,11 @@ arg.
 
 # 5. Extension module
 
-The `umsgpack_ext` module extends `umsgpack` to support `complex`, `set` and
-`tuple` types, but its design facilitates adding further Python built-in types
-or types supported by other libraries. Support is entirely transparent to the
-application: the added types behave in the same way as native types.
+The `umsgpack_ext` module extends `umsgpack` to support `complex`, `set`,
+`tuple` and `Pin` types, but its design facilitates adding further Python
+built-in types or types supported by other libraries. Support is entirely
+transparent to the application: the added types behave in the same way as
+native types.
 
 The following examples may be pasted at the REPL:
 ```python
@@ -207,8 +211,19 @@ with open('data', 'rb') as f:
     z = umsgpack.load(f)
 print(z)  # z is complex
 ```
- The file `umsgpack_ext.py` may be found in the `umsgpack` directory. To extend
- it to support additional types, see
+
+`Pin` handling requires a further configuration before being used, because
+class `Pin`'s first argument `id` is specific to the Micropython port. User
+has to set the correct value for `PIN_TYPE` with `umsgpack.PIN_TYPE = x`,
+in `umsgpack_ext.py` or somewhere else where the extension module is used.
+Valid values:
+ * `0` no Pin handling
+ * `1` integer, i.e., `Pin(0)`
+ * `2` string, i.e., `Pin('LED1')`
+ * `3` tuple, i.e., `Pin(('GPIO_1', 1))`
+
+The file `umsgpack_ext.py` may be found in the `umsgpack` directory. To extend
+it to support additional types, see
 [section 11](./README.md#11-notes-on-the-extension-module).
 
 # 6. Serialisable user classes
