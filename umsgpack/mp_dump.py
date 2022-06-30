@@ -8,7 +8,7 @@
 
 import struct
 import collections
-import io
+import uio
 try:
     from .umsgpack_ext import mpext
 except ImportError:
@@ -225,6 +225,6 @@ def dump(obj, fp, options):
 # Interface to __init__.py
 
 def dumps(obj, options):
-    fp = io.BytesIO()
+    fp = uio.BytesIO()
     dump(obj, fp, options)
     return fp.getvalue()

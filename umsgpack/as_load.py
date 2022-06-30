@@ -8,7 +8,7 @@
 
 import struct
 import collections
-import io
+import uio
 from uasyncio import StreamReader
 from . import *
 try:

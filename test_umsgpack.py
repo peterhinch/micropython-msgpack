@@ -15,7 +15,7 @@
 import sys
 import struct
 import unittest
-import io
+import uio
 from collections import OrderedDict, namedtuple
 
 import umsgpack
@@ -622,14 +622,14 @@ class TestUmsgpack(unittest.TestCase):
     def test_streaming_writer(self):
         # Try first composite test vector
         (_, obj, data) = composite_test_vectors[0]
-        writer = io.BytesIO()
+        writer = uio.BytesIO()
         umsgpack.dump(obj, writer)
         self.assertTrue(writer.getvalue(), data)
 
     def test_streaming_reader(self):
         # Try first composite test vector
         (_, obj, data) = composite_test_vectors[0]
-        reader = io.BytesIO(data)
+        reader = uio.BytesIO(data)
         self.assertEqual(umsgpack.load(reader), obj)
 
     def test_namespacing(self):
@@ -637,7 +637,7 @@ class TestUmsgpack(unittest.TestCase):
         exported_vars = list([x for x in dir(umsgpack) if not x.startswith("_")])
         # Ignore imports
         exported_vars = list([x for x in exported_vars if x != "struct" and x != "collections" and x != "datetime" and x !=
-                                    "sys" and x != "io" and x != "xrange" and x != "Hashable"])
+                                    "sys" and x != "uio" and x != "xrange" and x != "Hashable"])
 
         self.assertTrue(len(exported_vars) == len(exported_vars_test_vector))
         print(exported_vars)

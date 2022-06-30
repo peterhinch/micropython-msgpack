@@ -9,7 +9,7 @@
 
 import struct
 import collections
-import io
+import uio
 from . import *
 try:
     from . import umsgpack_ext
@@ -227,4 +227,4 @@ def load(fp, options):
 def loads(s, options):
     if not isinstance(s, (bytes, bytearray)):
         raise TypeError("packed data must be type 'bytes' or 'bytearray'")
-    return load(io.BytesIO(s), options)
+    return load(uio.BytesIO(s), options)
