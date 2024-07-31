@@ -9,7 +9,7 @@
 import struct
 import collections
 import io
-from uasyncio import StreamReader
+from asyncio import StreamReader
 from . import *
 try:
     from . import umsgpack_ext

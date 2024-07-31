@@ -313,8 +313,9 @@ async def receiver():
         res = await umsgpack.aload(sreader)
         print('Recieved', res)
 ```
-The demo `asyntest.py` runs on a Pyboard with pins X1 and X2 linked. The code
-includes notes regarding RAM overhead.
+The demo `asyntest.py` runs on a Pyboard (or Pi Pico) with pins X1 and X2 linked. The code includes notes regarding RAM overhead.
+
+The demo `asyntest_py3_serial.py` is similar, but meant to run on a computer with full python3.
 
 # 8. Ext Handlers
 
@@ -441,7 +442,7 @@ Python2 code removed.
 Compatibility mode removed.  
 Timestamps removed.  
 Converted to Python package with lazy import to save RAM.  
-Provide uasyncio StreamReader support.  
+Provide asyncio StreamReader support.
 Exported functions now match ujson: dump, dumps, load, loads (only).  
 Many functions refactored to save bytes, e.g. replacing the function dispatch
 table with code.  

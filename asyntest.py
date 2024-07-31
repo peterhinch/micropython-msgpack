@@ -9,12 +9,15 @@
 # This compares with 5312 bytes for a similar script sending plain text.
 # The MessagePack overhead is thus 13,248 bytes (12.9KiB).
 
-import uasyncio as asyncio
+import asyncio
 import umsgpack
-from machine import UART
+from machine import UART, Pin
 import gc
 
-uart = UART(4, 9600)
+try:
+    uart = UART(4, 9600)  # Pyboard (link pins X1 and X2)
+except ValueError:
+    uart = UART(0, baudrate=9600, tx=Pin(0), rx=Pin(1))  # Pi Pico (link pins 0 and 1)
 
 async def sender():
     swriter = asyncio.StreamWriter(uart, {})

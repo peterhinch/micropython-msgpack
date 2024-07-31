@@ -17,7 +17,7 @@
 # Compatibility mode removed.
 # Timestamps removed.
 # Converted to Python package with lazy import to save RAM.
-# Provide uasyncio StreamReader support.
+# Provide asyncio StreamReader support.
 # Exported functions now match ujson: dump, dumps, load, loads (only).
 # Many functions refactored to save bytes, especially replace function
 # dispatch table with code.
@@ -350,7 +350,7 @@ async def aload(fp, **options):
     Deserialize MessagePack bytes from a StreamReader into a Python object.
 
     Args:
-        fp: a uasyncio StreamReader object
+        fp: a asyncio StreamReader object
 
     Kwargs:
         ext_handlers (dict): dictionary of Ext handlers, mapping integer Ext
