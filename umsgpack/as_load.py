@@ -17,9 +17,14 @@ except ImportError:
     pass
 
 
+def _fail():  # Debug code should never be called.
+    raise Exception('Logic error')
+
+
 async def _re0(s, fp, n):
     d = await fp.readexactly(n)
     return struct.unpack(s, d)[0]
+
 
 async def _unpack_integer(code, fp):
     ic = ord(code)
