@@ -19,10 +19,15 @@ async def sender(swriter):
         await asyncio.sleep(5)
         obj[0] += 1
 
+class stream_observer:
+    def update(self, data: bytes) -> None:
+        print(f'data: {data}')
+
 async def receiver(sreader):
+    recv_observer = stream_observer()
     while True:
-        res = await umsgpack.aload(sreader)
-        print('Recieved', res)
+        res = await umsgpack.aload(sreader, observer=recv_observer)
+        print('Received', res)
 
 async def main():
     reader, writer = await serial_asyncio.open_serial_connection(url='/dev/ttyUSB0', baudrate=9600)
