@@ -31,10 +31,15 @@ async def sender():
         await asyncio.sleep(5)
         obj[0] += 1
 
+class stream_observer:
+    def update(self, data: bytes) -> None:
+        print(f'{data}')
+
 async def receiver():
+    recv_observer = stream_observer()
     sreader = asyncio.StreamReader(uart)
     while True:
-        res = await umsgpack.aload(sreader)
+        res = await umsgpack.aload(sreader, observer=recv_observer)
         print('Recieved', res)
 
 async def main():

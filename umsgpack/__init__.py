@@ -26,7 +26,7 @@
 # Method of detecting platform's float size changed.
 # Version reset to (0.1.0).
 
-__version__ = (0, 1, 1)
+__version__ = (0, 1, 2)
 
 
 ##############################################################################

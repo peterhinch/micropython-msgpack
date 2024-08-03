@@ -166,10 +166,13 @@ there is a practical use case for `ext_handlers`: an easier way is to use
  `dict`. (default `False`).
  3. `use_tuple` (bool): unpacks arrays into tuples, instead of lists (default
  `False`). The extension module (if used) makes this redundant.
- 4. `ext_handlers` a dictionary of Ext handlers, mapping integer Ext type to a
+ 4. `ext_handlers`: a dictionary of Ext handlers, mapping integer Ext type to a
  callable that unpacks an instance of Ext into an object. See
  [section 8](./README.md#8-ext-handlers).
-
+ 5. `observer` (aload only): an object with an update() method, which is
+ called with the results of each readexactly(n) call. This could be used, for
+ example, to calculate a CRC value on the received message data.
+ 
 Work is in progress to make `dict` instances ordered by default, so option 3
 may become pointless. The `umsgpack_ext` module enables tuples to be encoded in
 a different format to lists which is more flexible than the global `use_tuple`
