@@ -21,18 +21,25 @@ async def sender(swriter):
 
 class stream_observer:
     def update(self, data: bytes) -> None:
-        print(f'data: {data}')
+        print(f'{data}')
 
 async def receiver(sreader):
     recv_observer = stream_observer()
     while True:
         res = await umsgpack.aload(sreader, observer=recv_observer)
-        print('Received', res)
+        print('Received:', res)
+
+async def receiver_using_aloader(sreader):
+    uart_aloader = umsgpack.aloader(sreader, observer=stream_observer())
+    while True:
+        res = await uart_aloader.load()
+        print('Received (aloader):', res)
 
 async def main():
     reader, writer = await serial_asyncio.open_serial_connection(url='/dev/ttyUSB0', baudrate=9600)
     asyncio.create_task(sender(writer))
-    asyncio.create_task(receiver(reader))
+    # asyncio.create_task(receiver(reader))
+    asyncio.create_task(receiver_using_aloader(reader))
     while True:
         print('running...')
         await asyncio.sleep(20)

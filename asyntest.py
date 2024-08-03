@@ -36,15 +36,22 @@ class stream_observer:
         print(f'{data}')
 
 async def receiver():
-    recv_observer = stream_observer()
     sreader = asyncio.StreamReader(uart)
+    recv_observer = stream_observer()
     while True:
         res = await umsgpack.aload(sreader, observer=recv_observer)
         print('Recieved', res)
 
+async def receiver_using_aloader():
+    uart_aloader = umsgpack.aloader(asyncio.StreamReader(uart), observer=stream_observer())
+    while True:
+        res = await uart_aloader.load()
+        print('Received (aloader):', res)
+
 async def main():
     asyncio.create_task(sender())
-    asyncio.create_task(receiver())
+    # asyncio.create_task(receiver())
+    asyncio.create_task(receiver_using_aloader())
     while True:
         gc.collect()
         print('mem free', gc.mem_free())

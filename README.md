@@ -316,6 +316,17 @@ async def receiver():
         res = await umsgpack.aload(sreader)
         print('Recieved', res)
 ```
+
+Alternatively, instead of using the `aload()` method, an `aloader` class can be
+instantiated and utilized. For example:
+```python
+async def receiver():
+    uart_aloader = umsgpack.aloader(asyncio.StreamReader(uart))
+    while True:
+        res = await uart_aloader.load()
+        print('Received', res)
+```
+
 The demo `asyntest.py` runs on a Pyboard (or Pi Pico) with pins X1 and X2 linked. The code includes notes regarding RAM overhead.
 
 The demo `asyntest_py3_serial.py` is similar, but meant to run on a computer with full python3.

@@ -3,7 +3,7 @@
 # Adapted for MicroPython by Peter Hinch
 # Copyright (c) 2021 Peter Hinch Released under the MIT License see LICENSE
 
-# This is a port of the version at 
+# This is a port of the version at
 # https://github.com/vsergeev/u-msgpack-python
 # refactored to reduce RAM consumption and trimmed to remove functionality
 # irrelevant to MicroPython. It is compliant with a subset of the latest
@@ -26,7 +26,7 @@
 # Method of detecting platform's float size changed.
 # Version reset to (0.1.0).
 
-__version__ = (0, 1, 2)
+__version__ = (0, 1, 3)
 
 
 ##############################################################################
@@ -155,7 +155,6 @@ def ext_serializable(ext_type):
 # Exceptions
 ##############################################################################
 
-
 # Base Exception classes
 class PackException(Exception):
     "Base class for exceptions encountered during packing."
@@ -189,11 +188,13 @@ class UnhashableKeyException(UnpackException):
     The serialized map cannot be deserialized into a Python dictionary.
     """
 
-
 class DuplicateKeyException(UnpackException):
     "Duplicate key encountered during map unpacking."
 
+
+##############################################################################
 # Lazy module load to save RAM: takes about 20μs on Pyboard 1.x after initial load
+##############################################################################
 
 def load(fp, **options):
     """
@@ -362,6 +363,8 @@ async def aload(fp, **options):
                                  (default False)
         allow_invalid_utf8 (bool): unpack invalid strings into bytes
                                  (default False)
+        observer (object): an object with an update() method, which is called
+                           with the results of each readexactly(n) call
 
     Returns:
         A Python object.
@@ -380,10 +383,30 @@ async def aload(fp, **options):
             Duplicate key encountered during map unpacking.
 
     Example:
-    >>> f = open('test.bin', 'rb')
-    >>> umsgpack.loads(f)
-    {'compact': True, 'schema': 0}
+    >>> sreader = asyncio.StreamReader(uart)
+    >>> res = await umsgpack.aload(sreader)
+    >>> print('Recieved', res)
     >>>
     """
     from . import as_load
     return await as_load.aload(fp, options)
+
+def aloader(fp, **options):
+    """
+    Deserialize MessagePack bytes from a StreamReader into a Python object.
+    Similar as aload(), except instantiates an as_loader object to perform
+    the deserialization.
+    See aload() above for a description of args and exceptions.
+
+    Returns:
+        A new as_loader.aloader object.
+
+    Example:
+    >>> sreader = asyncio.StreamReader(uart)
+    >>> uart_aloader = umsgpack.aloader(sreader)
+    >>> res = await uart_aloader.load()
+    >>> print('Recieved', res)
+    >>>
+    """
+    from . import as_loader
+    return as_loader.aloader(fp, options)

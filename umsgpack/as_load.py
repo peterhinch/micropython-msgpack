@@ -8,8 +8,6 @@
 
 import struct
 import collections
-import io
-from asyncio import StreamReader
 from . import *
 try:
     from . import umsgpack_ext
@@ -127,6 +125,7 @@ async def _unpack_ext(code, fp, options):
 
     return ext
 
+
 async def _unpack_array(code, fp, options):
     ic = ord(code)
     if (ic & 0xf0) == 0x90:
@@ -217,6 +216,7 @@ async def _unpack(fp, options):
     if ic <= 0xdd:
         return await _unpack_array(code, fp, options)
     return await _unpack_map(code, fp, options)
+
 
 # Interface to __init__.py
 
