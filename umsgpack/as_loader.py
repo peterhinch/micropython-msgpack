@@ -4,10 +4,12 @@
 #              using an object-oriented implementation.
 
 # Copyright (c) 2024 Peter Hinch
+# Refactored as_load contributed by @bapowell
 
 import struct
 import collections
 from . import *
+
 try:
     from . import umsgpack_ext
 except ImportError:
@@ -15,8 +17,8 @@ except ImportError:
 
 
 class aloader:
-    """Deserialize MessagePack bytes from a StreamReader into a Python object.
-    """
+    """Deserialize MessagePack bytes from a StreamReader into a Python object."""
+
     def __init__(self, fp, options):
         self.fp = fp
         self.allow_invalid_utf8 = options.get("allow_invalid_utf8")
@@ -27,7 +29,7 @@ class aloader:
 
     @staticmethod
     def _fail():  # Debug code should never be called.
-        raise Exception('Logic error')
+        raise Exception("Logic error")
 
     async def _re(self, n):
         d = await self.fp.readexactly(n)
@@ -41,11 +43,11 @@ class aloader:
 
     async def _unpack_integer(self, code):
         ic = ord(code)
-        if (ic & 0xe0) == 0xe0:
+        if (ic & 0xE0) == 0xE0:
             return struct.unpack("b", code)[0]
         if (ic & 0x80) == 0x00:
             return struct.unpack("B", code)[0]
-        ic -= 0xcc
+        ic -= 0xCC
         off = ic << 1
         try:
             s = "B >H>I>Qb >h>i>q"[off : off + 2]
@@ -55,28 +57,28 @@ class aloader:
 
     async def _unpack_float(self, code):
         ic = ord(code)
-        if ic == 0xca:
+        if ic == 0xCA:
             return await self._re0(">f", 4)
-        if ic == 0xcb:
+        if ic == 0xCB:
             return await self._re0(">d", 8)
         aloader._fail()
 
     async def _unpack_string(self, code):
         ic = ord(code)
-        if (ic & 0xe0) == 0xa0:
-            length = ic & ~0xe0
-        elif ic == 0xd9:
+        if (ic & 0xE0) == 0xA0:
+            length = ic & ~0xE0
+        elif ic == 0xD9:
             length = await self._re0("B", 1)
-        elif ic == 0xda:
+        elif ic == 0xDA:
             length = await self._re0(">H", 2)
-        elif ic == 0xdb:
+        elif ic == 0xDB:
             length = await self._re0(">I", 4)
         else:
             aloader._fail()
 
         data = await self._re(length)
         try:
-            return str(data, 'utf-8')  # Preferred MP way to decode
+            return str(data, "utf-8")  # Preferred MP way to decode
         except:  # MP does not have UnicodeDecodeError
             if self.allow_invalid_utf8:
                 return data  # MP Remove InvalidString class: subclass of built-in class
@@ -84,11 +86,11 @@ class aloader:
 
     async def _unpack_binary(self, code):
         ic = ord(code)
-        if ic == 0xc4:
+        if ic == 0xC4:
             length = await self._re0("B", 1)
-        elif ic == 0xc5:
+        elif ic == 0xC5:
             length = await self._re0(">H", 2)
-        elif ic == 0xc6:
+        elif ic == 0xC6:
             length = await self._re0(">I", 4)
         else:
             aloader._fail()
@@ -97,14 +99,14 @@ class aloader:
 
     async def _unpack_ext(self, code):
         ic = ord(code)
-        n = b'\xd4\xd5\xd6\xd7\xd8'.find(code)
+        n = b"\xd4\xd5\xd6\xd7\xd8".find(code)
         length = 0 if n < 0 else 1 << n
         if not length:
-            if ic == 0xc7:
+            if ic == 0xC7:
                 length = await self._re0("B", 1)
-            elif ic == 0xc8:
+            elif ic == 0xC8:
                 length = await self._re0(">H", 2)
-            elif ic == 0xc9:
+            elif ic == 0xC9:
                 length = await self._re0(">I", 4)
             else:
                 aloader._fail()
@@ -119,21 +121,23 @@ class aloader:
         if self.ext_handlers and ext.type in self.ext_handlers:
             return self.ext_handlers[ext.type](ext)
         # Unpack with ext classes, if type is registered
-        if ext_type in _ext_type_to_class:  # bug?: should this instead be ext_type_to_class, from __init__.py ?
+        if ext_type in ext_type_to_class:
             try:
-                return _ext_type_to_class[ext_type].unpackb(ext_data)
+                return ext_type_to_class[ext_type].unpackb(ext_data)
             except AttributeError:
-                raise NotImplementedError("Ext class {:s} lacks unpackb()".format(repr(_ext_type_to_class[ext_type])))
+                raise NotImplementedError(
+                    "Ext class {:s} lacks unpackb()".format(repr(ext_type_to_class[ext_type]))
+                )
 
         return ext
 
     async def _unpack_array(self, code):
         ic = ord(code)
-        if (ic & 0xf0) == 0x90:
-            length = (ic & ~0xf0)
-        elif ic == 0xdc:
+        if (ic & 0xF0) == 0x90:
+            length = ic & ~0xF0
+        elif ic == 0xDC:
             length = await self._re0(">H", 2)
-        elif ic == 0xdd:
+        elif ic == 0xDD:
             length = await self._re0(">I", 4)
         else:
             aloader._fail()
@@ -150,11 +154,11 @@ class aloader:
 
     async def _unpack_map(self, code):
         ic = ord(code)
-        if (ic & 0xf0) == 0x80:
-            length = (ic & ~0xf0)
-        elif ic == 0xde:
+        if (ic & 0xF0) == 0x80:
+            length = ic & ~0xF0
+        elif ic == 0xDE:
             length = await self._re0(">H", 2)
-        elif ic == 0xdf:
+        elif ic == 0xDF:
             length = await self._re0(">I", 4)
         else:
             aloader._fail()
@@ -170,11 +174,11 @@ class aloader:
             try:
                 hash(k)
             except:
-                raise UnhashableKeyException(
-                    "unhashable key: \"{:s}\"".format(str(k)))
+                raise UnhashableKeyException('unhashable key: "{:s}"'.format(str(k)))
             if k in d:
                 raise DuplicateKeyException(
-                    "duplicate key: \"{:s}\" ({:s})".format(str(k), str(type(k))))
+                    'duplicate key: "{:s}" ({:s})'.format(str(k), str(type(k)))
+                )
 
             # Unpack value
             v = await self._unpack()
@@ -182,36 +186,35 @@ class aloader:
             try:
                 d[k] = v
             except TypeError:
-                raise UnhashableKeyException(
-                    "unhashable key: \"{:s}\"".format(str(k)))
+                raise UnhashableKeyException('unhashable key: "{:s}"'.format(str(k)))
         return d
 
     async def _unpack(self):
         code = await self._re(1)
         ic = ord(code)
-        if (ic <= 0x7f) or (0xcc <= ic <= 0xd3) or (0xe0 <= ic <= 0xff):
+        if (ic <= 0x7F) or (0xCC <= ic <= 0xD3) or (0xE0 <= ic <= 0xFF):
             return await self._unpack_integer(code)
-        if ic <= 0xc9:
-            if ic <= 0xc3:
-                if ic <= 0x8f:
+        if ic <= 0xC9:
+            if ic <= 0xC3:
+                if ic <= 0x8F:
                     return await self._unpack_map(code)
-                if ic <= 0x9f:
+                if ic <= 0x9F:
                     return await self._unpack_array(code)
-                if ic <= 0xbf:
+                if ic <= 0xBF:
                     return await self._unpack_string(code)
-                if ic == 0xc1:
+                if ic == 0xC1:
                     raise ReservedCodeException("got reserved code: 0xc1")
-                return (None, 0, False, True)[ic - 0xc0]
-            if ic <= 0xc6:
+                return (None, 0, False, True)[ic - 0xC0]
+            if ic <= 0xC6:
                 return await self._unpack_binary(code)
             return self._unpack_ext(code)
-        if ic <= 0xcb:
+        if ic <= 0xCB:
             return await self._unpack_float(code)
-        if ic <= 0xd8:
+        if ic <= 0xD8:
             return await self._unpack_ext(code)
-        if ic <= 0xdb:
+        if ic <= 0xDB:
             return await self._unpack_string(code)
-        if ic <= 0xdd:
+        if ic <= 0xDD:
             return await self._unpack_array(code)
         return await self._unpack_map(code)
 

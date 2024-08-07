@@ -120,6 +120,36 @@ code to dump data or that to support asynchronous programming.
 
 # 3. Installation
 
+## 3.1 Quick install
+
+The library may be installed using the official `mpremote`:
+```bash
+$ mpremote mip install "github:peterhinch/micropython-msgpack"
+```
+
+## 3.2 Files
+
+The following files are installed by `mpremote`:  
+1. `umsgpack/__init__.py` Necessary library support.  
+2. `umsgpack/mp_dump.py` Supports `dump` and `dumps` commands.  
+3. `umsgpack/mp_load.py` Supports `load` and `loads` commands.  
+4. `umsgpack/as_load.py` Support for `aload` command (asynchronous load).  
+5. `umsgpack/as_loader.py` Supports `aloader` asynchronous loader class.  
+6. `umsgpack/umsgpack_ext.py` Extends MessagePack to support `complex`, `set` and `tuple`.  
+7. `asyntest.py` Demo of asynchronous use of MessagePack.  
+8. `user_class.py` Demo of a user defined class that is serialisable by messagePack.  
+
+In a minimal installation only items 1-3 are required.
+
+Additional files:
+1. `asyntest_py3_serial` Demo of running the library on a PC.
+2. `run_test_suite` Bash script to run the full test suite.
+3. `test_umsgpack.py` The actual full test suite.
+
+See [section 10](./README.md#10-test-suite) for details of the test suite.
+
+## 3.3 Manual install
+
 Clone the repo by moving to a directory on your PC and issuing
 ```bash
 $ git clone https://github.com/peterhinch/micropython-msgpack
@@ -172,7 +202,7 @@ there is a practical use case for `ext_handlers`: an easier way is to use
  5. `observer` (aload only): an object with an update() method, which is
  called with the results of each readexactly(n) call. This could be used, for
  example, to calculate a CRC value on the received message data.
- 
+
 Work is in progress to make `dict` instances ordered by default, so option 3
 may become pointless. The `umsgpack_ext` module enables tuples to be encoded in
 a different format to lists which is more flexible than the global `use_tuple`
@@ -327,7 +357,9 @@ async def receiver():
         print('Received', res)
 ```
 
-The demo `asyntest.py` runs on a Pyboard (or Pi Pico) with pins X1 and X2 linked. The code includes notes regarding RAM overhead.
+The demo `asyntest.py` runs on a Pyboard with pins X1 and X2 linked. See code
+comments for connections with other platforms. The code includes notes regarding
+RAM overhead.
 
 The demo `asyntest_py3_serial.py` is similar, but meant to run on a computer with full python3.
 
@@ -438,7 +470,7 @@ MicroPython because it tests large data types: the test suite causes memory
 errors when compiled under even the Unix build of MicroPython. The file
 `umsgpack_ext.py` should not be present: this is because the test suite assumes
 that `complex` and `set` are not supported. The script `run_test_suite` renames
-`umsgpack_ext.py`, runs the tests and restores the file. 
+`umsgpack_ext.py`, runs the tests and restores the file.
 
 # 11. Changes for MicroPython
 

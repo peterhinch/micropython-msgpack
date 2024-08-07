@@ -1,0 +1,13 @@
+{
+  "urls": [
+    ["umsgpack/__init__.py", "github:peterhinch/micropython-msgpack/umsgpack/__init__.py"],
+    ["umsgpack/as_load.py", "github:peterhinch/micropython-msgpack/umsgpack/as_load.py"],
+    ["umsgpack/as_loader.py", "github:peterhinch/micropython-msgpack/umsgpack/as_loader.py"],
+    ["umsgpack/mp_dump.py", "github:peterhinch/micropython-msgpack/umsgpack/mp_dump.py"],
+    ["umsgpack/mp_load.py", "github:peterhinch/micropython-msgpack/umsgpack/mp_load.py"],
+    ["umsgpack/umsgpack_ext.py", "github:peterhinch/micropython-msgpack/umsgpack/umsgpack_ext.py"],
+    ["asyntest.py", "github:peterhinch/micropython-msgpack/asyntest.py"],
+    ["user_class.py", "github:peterhinch/micropython-msgpack/user_class.py"]
+  ],
+  "version": "0.1"
+}
