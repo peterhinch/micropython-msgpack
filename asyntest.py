@@ -1,23 +1,29 @@
 # asyntest.py Test/demo of asychronous use of MessagePack
 
-# Configured for a Pyboard. Link pins X1 and X2.
-
 # Copyright (c) 2021 Peter Hinch Released under the MIT License see LICENSE
 
-# Free RAM after reset 101504 bytes. Free RAM while running 82944 bytes
-# Usage 18560 bytes i.e. ~18.1KiB
-# This compares with 5312 bytes for a similar script sending plain text.
-# The MessagePack overhead is thus 13,248 bytes (12.9KiB).
+# From testing on a pyboard:
+#   Free RAM after reset 101504 bytes. Free RAM while running 82944 bytes
+#   Usage 18560 bytes i.e. ~18.1KiB
+#   This compares with 5312 bytes for a similar script sending plain text.
+#   The MessagePack overhead is thus 13,248 bytes (12.9KiB).
 
+from sys import platform
 import asyncio
 import umsgpack
 from machine import UART, Pin
 import gc
 
-try:
+
+if platform == "pyboard":
     uart = UART(4, 9600)  # Pyboard (link pins X1 and X2)
-except ValueError:
+elif platform == "rp2":
     uart = UART(0, baudrate=9600, tx=Pin(0), rx=Pin(1))  # Pi Pico (link pins 0 and 1)
+elif platform == "esp32":
+    uart = UART(2, baudrate=9600, tx=17, rx=16)  # Adafruit Huzzah32 (link pins TX and RX)
+else:
+    raise OSError(f"Unknown platform {platform}")
+
 
 async def sender():
     swriter = asyncio.StreamWriter(uart, {})
