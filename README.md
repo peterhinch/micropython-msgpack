@@ -166,10 +166,13 @@ there is a practical use case for `ext_handlers`: an easier way is to use
  `dict`. (default `False`).
  3. `use_tuple` (bool): unpacks arrays into tuples, instead of lists (default
  `False`). The extension module (if used) makes this redundant.
- 4. `ext_handlers` a dictionary of Ext handlers, mapping integer Ext type to a
+ 4. `ext_handlers`: a dictionary of Ext handlers, mapping integer Ext type to a
  callable that unpacks an instance of Ext into an object. See
  [section 8](./README.md#8-ext-handlers).
-
+ 5. `observer` (aload only): an object with an update() method, which is
+ called with the results of each readexactly(n) call. This could be used, for
+ example, to calculate a CRC value on the received message data.
+ 
 Work is in progress to make `dict` instances ordered by default, so option 3
 may become pointless. The `umsgpack_ext` module enables tuples to be encoded in
 a different format to lists which is more flexible than the global `use_tuple`
@@ -313,8 +316,20 @@ async def receiver():
         res = await umsgpack.aload(sreader)
         print('Recieved', res)
 ```
-The demo `asyntest.py` runs on a Pyboard with pins X1 and X2 linked. The code
-includes notes regarding RAM overhead.
+
+Alternatively, instead of using the `aload()` method, an `aloader` class can be
+instantiated and utilized. For example:
+```python
+async def receiver():
+    uart_aloader = umsgpack.aloader(asyncio.StreamReader(uart))
+    while True:
+        res = await uart_aloader.load()
+        print('Received', res)
+```
+
+The demo `asyntest.py` runs on a Pyboard (or Pi Pico) with pins X1 and X2 linked. The code includes notes regarding RAM overhead.
+
+The demo `asyntest_py3_serial.py` is similar, but meant to run on a computer with full python3.
 
 # 8. Ext Handlers
 
@@ -441,7 +456,7 @@ Python2 code removed.
 Compatibility mode removed.  
 Timestamps removed.  
 Converted to Python package with lazy import to save RAM.  
-Provide uasyncio StreamReader support.  
+Provide asyncio StreamReader support.
 Exported functions now match ujson: dump, dumps, load, loads (only).  
 Many functions refactored to save bytes, e.g. replacing the function dispatch
 table with code.  

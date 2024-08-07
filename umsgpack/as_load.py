@@ -8,8 +8,6 @@
 
 import struct
 import collections
-import io
-from uasyncio import StreamReader
 from . import *
 try:
     from . import umsgpack_ext
@@ -17,11 +15,24 @@ except ImportError:
     pass
 
 
-async def _re0(s, fp, n):
+def _fail():  # Debug code should never be called.
+    raise Exception('Logic error')
+
+
+async def _re(fp, n, options):
     d = await fp.readexactly(n)
+    observer = options.get("observer")
+    if observer:
+        observer.update(d)
+    return d
+
+
+async def _re0(s, fp, n, options):
+    d = await _re(fp, n, options)
     return struct.unpack(s, d)[0]
 
-async def _unpack_integer(code, fp):
+
+async def _unpack_integer(code, fp, options):
     ic = ord(code)
     if (ic & 0xe0) == 0xe0:
         return struct.unpack("b", code)[0]
@@ -33,15 +44,15 @@ async def _unpack_integer(code, fp):
         s = "B >H>I>Qb >h>i>q"[off : off + 2]
     except IndexError:
         _fail()
-    return await _re0(s.strip(), fp, 1 << (ic & 3))
+    return await _re0(s.strip(), fp, 1 << (ic & 3), options)
 
 
-async def _unpack_float(code, fp):
+async def _unpack_float(code, fp, options):
     ic = ord(code)
     if ic == 0xca:
-        return await _re0(">f", fp, 4)
+        return await _re0(">f", fp, 4, options)
     if ic == 0xcb:
-        return await _re0(">d", fp, 8)
+        return await _re0(">d", fp, 8, options)
     _fail()
 
 
@@ -50,15 +61,15 @@ async def _unpack_string(code, fp, options):
     if (ic & 0xe0) == 0xa0:
         length = ic & ~0xe0
     elif ic == 0xd9:
-        length = await _re0("B", fp, 1)
+        length = await _re0("B", fp, 1, options)
     elif ic == 0xda:
-        length = await _re0(">H", fp, 2)
+        length = await _re0(">H", fp, 2, options)
     elif ic == 0xdb:
-        length = await _re0(">I", fp, 4)
+        length = await _re0(">I", fp, 4, options)
     else:
         _fail()
 
-    data = await fp.readexactly(length)
+    data = await _re(fp, length, options)
     try:
         return str(data, 'utf-8')  # Preferred MP way to decode
     except:  # MP does not have UnicodeDecodeError
@@ -67,18 +78,18 @@ async def _unpack_string(code, fp, options):
         raise InvalidStringException("unpacked string is invalid utf-8")
 
 
-async def _unpack_binary(code, fp):
+async def _unpack_binary(code, fp, options):
     ic = ord(code)
     if ic == 0xc4:
-        length = await _re0("B", fp, 1)
+        length = await _re0("B", fp, 1, options)
     elif ic == 0xc5:
-        length = await _re0(">H", fp, 2)
+        length = await _re0(">H", fp, 2, options)
     elif ic == 0xc6:
-        length = await _re0(">I", fp, 4)
+        length = await _re0(">I", fp, 4, options)
     else:
         _fail()
 
-    return await fp.readexactly(length)
+    return await _re(fp, length, options)
 
 
 async def _unpack_ext(code, fp, options):
@@ -87,16 +98,16 @@ async def _unpack_ext(code, fp, options):
     length = 0 if n < 0 else 1 << n
     if not length:
         if ic == 0xc7:
-            length = await _re0("B", fp, 1)
+            length = await _re0("B", fp, 1, options)
         elif ic == 0xc8:
-            length = await _re0(">H", fp, 2)
+            length = await _re0(">H", fp, 2, options)
         elif ic == 0xc9:
-            length = await _re0(">I", fp, 4)
+            length = await _re0(">I", fp, 4, options)
         else:
             _fail()
 
-    ext_type = await _re0("b", fp, 1)
-    ext_data = await fp.readexactly(length)
+    ext_type = await _re0("b", fp, 1, options)
+    ext_data = await _re(fp, length, options)
 
     # Create extension object
     ext = Ext(ext_type, ext_data)
@@ -114,14 +125,15 @@ async def _unpack_ext(code, fp, options):
 
     return ext
 
+
 async def _unpack_array(code, fp, options):
     ic = ord(code)
     if (ic & 0xf0) == 0x90:
         length = (ic & ~0xf0)
     elif ic == 0xdc:
-        length = await _re0(">H", fp, 2)
+        length = await _re0(">H", fp, 2, options)
     elif ic == 0xdd:
-        length = await _re0(">I", fp, 4)
+        length = await _re0(">I", fp, 4, options)
     else:
         _fail()
     l = []
@@ -141,9 +153,9 @@ async def _unpack_map(code, fp, options):
     if (ic & 0xf0) == 0x80:
         length = (ic & ~0xf0)
     elif ic == 0xde:
-        length = await _re0(">H", fp, 2)
+        length = await _re0(">H", fp, 2, options)
     elif ic == 0xdf:
-        length = await _re0(">I", fp, 4)
+        length = await _re0(">I", fp, 4, options)
     else:
         _fail()
 
@@ -177,10 +189,10 @@ async def _unpack_map(code, fp, options):
 
 
 async def _unpack(fp, options):
-    code = await fp.readexactly(1)
+    code = await _re(fp, 1, options)
     ic = ord(code)
     if (ic <= 0x7f) or (0xcc <= ic <= 0xd3) or (0xe0 <= ic <= 0xff):
-        return await _unpack_integer(code, fp)
+        return await _unpack_integer(code, fp, options)
     if ic <= 0xc9:
         if ic <= 0xc3:
             if ic <= 0x8f:
@@ -193,10 +205,10 @@ async def _unpack(fp, options):
                 raise ReservedCodeException("got reserved code: 0xc1")
             return (None, 0, False, True)[ic - 0xc0]
         if ic <= 0xc6:
-            return await _unpack_binary(code, fp)
+            return await _unpack_binary(code, fp, options)
         return _unpack_ext(code, fp, options)
     if ic <= 0xcb:
-        return await _unpack_float(code, fp)
+        return await _unpack_float(code, fp, options)
     if ic <= 0xd8:
         return await _unpack_ext(code, fp, options)
     if ic <= 0xdb:
@@ -204,6 +216,7 @@ async def _unpack(fp, options):
     if ic <= 0xdd:
         return await _unpack_array(code, fp, options)
     return await _unpack_map(code, fp, options)
+
 
 # Interface to __init__.py
 
