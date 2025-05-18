@@ -203,7 +203,7 @@ there is a practical use case for `ext_handlers`: an easier way is to use
  called with the results of each readexactly(n) call. This could be used, for
  example, to calculate a CRC value on the received message data.
 
-Work is in progress to make `dict` instances ordered by default, so option 3
+Work is in progress to make `dict` instances ordered by default, so option 2
 may become pointless. The `umsgpack_ext` module enables tuples to be encoded in
 a different format to lists which is more flexible than the global `use_tuple`
 arg.
