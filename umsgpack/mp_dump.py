@@ -194,7 +194,7 @@ def dump(obj, fp, options):
         _pack_float(obj, fp, options)
     elif isinstance(obj, str):
         _pack_string(obj, fp)
-    elif isinstance(obj, bytes):
+    elif isinstance(obj, (bytes, bytearray)):
         _pack_binary(obj, fp)
     elif isinstance(obj, (list, tuple)):
         _pack_array(obj, fp, options)

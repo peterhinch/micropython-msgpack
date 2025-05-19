@@ -24,6 +24,8 @@ def mpext(obj, options):
         return Set(obj)
     if isinstance(obj, tuple):
         return Tuple(obj)
+    if isinstance(obj, bytearray):
+        return ByteArray(obj)
     return obj
 
 @umsgpack.ext_serializable(0x50)
@@ -70,3 +72,18 @@ class Tuple:
     @staticmethod
     def unpackb(data):
         return tuple(umsgpack.loads(data))
+
+@umsgpack.ext_serializable(0x53)
+class ByteArray:
+    def __init__(self, s):
+        self.s = s
+
+    def __str__(self):
+        return "ByteArray({})".format(self.s)
+
+    def packb(self):
+        return umsgpack.dumps(bytes(self.s))
+
+    @staticmethod
+    def unpackb(data):
+        return bytearray(umsgpack.loads(data))

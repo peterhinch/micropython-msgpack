@@ -60,6 +60,7 @@ following:
  if it is encoded as a `tuple` it will be decoded as one.
  * `complex`
  * `set`
+ * `bytearray`
 
 
 
@@ -110,13 +111,26 @@ In particular, it supports the new binary, UTF-8 string and application-defined
 ext types. As stated above, timestamps are unsupported.
 
 The repository includes `umsgpack/umsgpack_ext.py` which optionally extends the
-library to support Python `set`, `complex` and `tuple` objects. The aim is to
-show how this can easily be extended to include further types.
+library to support Python `set`, `complex`, `tuple` and `bytearray` objects.
+The aim is to show how this can easily be extended to include further types.
 
 This MicroPython version uses various techniques to minimise RAM use including
 "lazy imports": a module is only imported on first usage. For example an
 application that only de-serialises data using synchronous code will not import
 code to dump data or that to support asynchronous programming.
+
+# 2.1 Inter-operation
+
+The un-extended module conforms to the MessagePack specification. Consequently
+messages may be exchanged between systems using different MessagePack modules
+including applications written in non-Python languages. If the extension module
+is to be used in such applications, a matching extension will be required by
+the foreign language party.
+
+The MessagePack specification does not distinguish between mutable and
+immutable types. Consequently the non-extended module will be unable to
+distinguish `tuple` and `list` items, also `bytes` and `bytearray`. The
+extension module addresses this.
 
 # 3. Installation
 
