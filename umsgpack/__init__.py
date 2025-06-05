@@ -71,7 +71,7 @@ class Ext:
             raise ValueError("ext type value {:d} is out of range (-128 to 127)".format(type))
         # Check data is type bytes
         elif not isinstance(data, bytes):
-            raise TypeError("ext data is not type \'bytes\'")
+            raise TypeError("ext data is not type 'bytes'")
         self.type = type
         self.data = data
 
@@ -79,9 +79,11 @@ class Ext:
         """
         Compare this Ext object with another for equality.
         """
-        return (isinstance(other, self.__class__) and
-                self.type == other.type and
-                self.data == other.data)
+        return (
+            isinstance(other, self.__class__)
+            and self.type == other.type
+            and self.data == other.data
+        )
 
     def __ne__(self, other):
         """
@@ -94,8 +96,9 @@ class Ext:
         String representation of this Ext object.
         """
         s = "Ext Object (Type: {:d}, Data: ".format(self.type)
-        s += " ".join(["0x{:02}".format(ord(self.data[i:i + 1]))
-                       for i in xrange(min(len(self.data), 8))])
+        s += " ".join(
+            ["0x{:02}".format(ord(self.data[i : i + 1])) for i in xrange(min(len(self.data), 8))]
+        )
         if len(self.data) > 8:
             s += " ..."
         s += ")"
@@ -114,9 +117,10 @@ class Ext:
 
 ext_class_to_type = {}
 ext_type_to_class = {}
+types = {}
 
 
-def ext_serializable(ext_type):
+def ext_serializable(ext_type, example):
     """
     Return a decorator to register a class for automatic packing and unpacking
     with the specified Ext type code. The application class should implement a
@@ -125,6 +129,7 @@ def ext_serializable(ext_type):
     instance of the application class.
     Args:
         ext_type: application-defined Ext type code
+        example: the type to be encoded
     Raises:
         TypeError:
             Ext type is not an integer.
@@ -133,19 +138,26 @@ def ext_serializable(ext_type):
         ValueError:
             Ext type or class already registered.
     """
+
     def wrapper(cls):
         if not isinstance(ext_type, int):
             raise TypeError("Ext type is not type integer")
         elif not (-128 <= ext_type <= 127):
             raise ValueError("Ext type value {:d} is out of range of -128 to 127".format(ext_type))
         elif ext_type in ext_type_to_class:
-            raise ValueError("Ext type {:d} already registered with class {:s}".format(ext_type, repr(ext_type_to_class[ext_type])))
+            raise ValueError(
+                "Ext type {:d} already registered with class {:s}".format(
+                    ext_type, repr(ext_type_to_class[ext_type])
+                )
+            )
         elif cls in ext_class_to_type:
-            raise ValueError("Class {:s} already registered with Ext type {:d}".format(repr(cls), ext_type))
+            raise ValueError(
+                "Class {:s} already registered with Ext type {:d}".format(repr(cls), ext_type)
+            )
 
         ext_type_to_class[ext_type] = cls
         ext_class_to_type[cls] = ext_type
-
+        types[example] = cls  # dump associates an external object with its codec class
         return cls
 
     return wrapper
@@ -188,6 +200,7 @@ class UnhashableKeyException(UnpackException):
     The serialized map cannot be deserialized into a Python dictionary.
     """
 
+
 class DuplicateKeyException(UnpackException):
     "Duplicate key encountered during map unpacking."
 
@@ -195,6 +208,7 @@ class DuplicateKeyException(UnpackException):
 ##############################################################################
 # Lazy module load to save RAM: takes about 20μs on Pyboard 1.x after initial load
 ##############################################################################
+
 
 def load(fp, **options):
     """
@@ -237,7 +251,9 @@ def load(fp, **options):
     >>>
     """
     from . import mp_load
+
     return mp_load.load(fp, options)
+
 
 def loads(s, **options):
     """
@@ -281,7 +297,9 @@ def loads(s, **options):
     >>>
     """
     from . import mp_load
+
     return mp_load.loads(s, options)
+
 
 def dump(obj, fp, **options):
     """
@@ -313,7 +331,9 @@ def dump(obj, fp, **options):
     >>>
     """
     from . import mp_dump
+
     mp_dump.dump(obj, fp, options)
+
 
 def dumps(obj, **options):
     """
@@ -344,7 +364,9 @@ def dumps(obj, **options):
     >>>
     """
     from . import mp_dump
+
     return mp_dump.dumps(obj, options)
+
 
 async def aload(fp, **options):
     """
@@ -389,7 +411,9 @@ async def aload(fp, **options):
     >>>
     """
     from . import as_load
+
     return await as_load.aload(fp, options)
+
 
 def aloader(fp, **options):
     """
@@ -409,4 +433,5 @@ def aloader(fp, **options):
     >>>
     """
     from . import as_loader
+
     return as_loader.aloader(fp, options)

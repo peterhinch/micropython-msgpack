@@ -9,35 +9,46 @@
 import struct
 import collections
 import io
-try:
-    from .umsgpack_ext import mpext
-except ImportError:
-    mpext = lambda x, _ : x
-
+from . import umsgpack_ext  # TODO application imports this
 from . import *
 
 # Auto-detect system float precision
-_float_precision = "single" if len(str(1/3)) < 13 else "double"
+_float_precision = "single" if len(str(1 / 3)) < 13 else "double"
+
+# Entries in mpext are required where types are to be handled without declaring
+# an ext_serializable class in the application. This example enables complex,
+# tuple and set types to be packed as if they were native to umsgpack.
+# Options (kwargs to dump and dumps) may be passed to constructor including new
+# type-specific options
+def mpext(obj, options):
+    for t in types:
+        print(obj, t, types[t])
+        if isinstance(obj, t):
+            return types[t](obj, options)
+    return obj
+
 
 def _fail():  # Debug code should never be called.
-    raise Exception('Logic error')
+    raise Exception("Logic error")
+
 
 # struct.pack returns a bytes object
+
 
 def _pack_integer(obj, fp):
     if obj < 0:
         if obj >= -32:
             fp.write(struct.pack("b", obj))
-        elif obj >= -2**(8 - 1):
+        elif obj >= -(2 ** (8 - 1)):
             fp.write(b"\xd0")
             fp.write(struct.pack("b", obj))
-        elif obj >= -2**(16 - 1):
+        elif obj >= -(2 ** (16 - 1)):
             fp.write(b"\xd1")
             fp.write(struct.pack(">h", obj))
-        elif obj >= -2**(32 - 1):
+        elif obj >= -(2 ** (32 - 1)):
             fp.write(b"\xd2")
             fp.write(struct.pack(">i", obj))
-        elif obj >= -2**(64 - 1):
+        elif obj >= -(2 ** (64 - 1)):
             fp.write(b"\xd3")
             fp.write(struct.pack(">q", obj))
         else:
@@ -45,16 +56,16 @@ def _pack_integer(obj, fp):
     else:
         if obj < 128:
             fp.write(struct.pack("B", obj))
-        elif obj < 2**8:
+        elif obj < 2 ** 8:
             fp.write(b"\xcc")
             fp.write(struct.pack("B", obj))
-        elif obj < 2**16:
+        elif obj < 2 ** 16:
             fp.write(b"\xcd")
             fp.write(struct.pack(">H", obj))
-        elif obj < 2**32:
+        elif obj < 2 ** 32:
             fp.write(b"\xce")
             fp.write(struct.pack(">I", obj))
-        elif obj < 2**64:
+        elif obj < 2 ** 64:
             fp.write(b"\xcf")
             fp.write(struct.pack(">Q", obj))
         else:
@@ -70,7 +81,7 @@ def _pack_boolean(obj, fp):
 
 
 def _pack_float(obj, fp, options):
-    fpr = options.get('force_float_precision', _float_precision)
+    fpr = options.get("force_float_precision", _float_precision)
     if fpr == "double":
         fp.write(b"\xcb")
         fp.write(struct.pack(">d", obj))
@@ -82,67 +93,70 @@ def _pack_float(obj, fp, options):
 
 
 def _pack_string(obj, fp):
-    obj = bytes(obj, 'utf-8')  # Preferred MP encode method
+    obj = bytes(obj, "utf-8")  # Preferred MP encode method
     obj_len = len(obj)
     if obj_len < 32:
-        fp.write(struct.pack("B", 0xa0 | obj_len))
-    elif obj_len < 2**8:
+        fp.write(struct.pack("B", 0xA0 | obj_len))
+    elif obj_len < 2 ** 8:
         fp.write(b"\xd9")
         fp.write(struct.pack("B", obj_len))
-    elif obj_len < 2**16:
+    elif obj_len < 2 ** 16:
         fp.write(b"\xda")
         fp.write(struct.pack(">H", obj_len))
-    elif obj_len < 2**32:
+    elif obj_len < 2 ** 32:
         fp.write(b"\xdb")
         fp.write(struct.pack(">I", obj_len))
     else:
         raise UnsupportedTypeException("huge string")
     fp.write(obj)
 
+
 def _pack_binary(obj, fp):
     obj_len = len(obj)
-    if obj_len < 2**8:
+    if obj_len < 2 ** 8:
         fp.write(b"\xc4")
         fp.write(struct.pack("B", obj_len))
-    elif obj_len < 2**16:
+    elif obj_len < 2 ** 16:
         fp.write(b"\xc5")
         fp.write(struct.pack(">H", obj_len))
-    elif obj_len < 2**32:
+    elif obj_len < 2 ** 32:
         fp.write(b"\xc6")
         fp.write(struct.pack(">I", obj_len))
     else:
         raise UnsupportedTypeException("huge binary string")
     fp.write(obj)
 
-def _pack_ext(obj, fp, tb = b'\x00\xd4\xd5\x00\xd6\x00\x00\x00\xd7\x00\x00\x00\x00\x00\x00\x00\xd8'):
+
+def _pack_ext(obj, fp, tb=b"\x00\xd4\xd5\x00\xd6\x00\x00\x00\xd7\x00\x00\x00\x00\x00\x00\x00\xd8"):
     od = obj.data
     obj_len = len(od)
-    ot = obj.type & 0xff
+    ot = obj.type & 0xFF
     code = tb[obj_len] if obj_len <= 16 else 0
     if code:
-        fp.write(int.to_bytes(code, 1, 'big'))
+        fp.write(int.to_bytes(code, 1, "big"))
         fp.write(struct.pack("B", ot))
-    elif obj_len < 2**8:
+    elif obj_len < 2 ** 8:
         fp.write(b"\xc7")
         fp.write(struct.pack("BB", obj_len, ot))
-    elif obj_len < 2**16:
+    elif obj_len < 2 ** 16:
         fp.write(b"\xc8")
         fp.write(struct.pack(">HB", obj_len, ot))
-    elif obj_len < 2**32:
+    elif obj_len < 2 ** 32:
         fp.write(b"\xc9")
         fp.write(struct.pack(">IB", obj_len, ot))
     else:
         raise UnsupportedTypeException("huge ext data")
     fp.write(od)
 
+
 def _pack_array(obj, fp, options):
     obj_len = len(obj)
     if obj_len < 16:
         fp.write(struct.pack("B", 0x90 | obj_len))
-    elif obj_len < 2**16:
+    elif obj_len < 2 ** 16:
         fp.write(b"\xdc")
         fp.write(struct.pack(">H", obj_len))
-    elif obj_len < 2**32:
+    elif obj_len < 2 ** 32:
         fp.write(b"\xdd")
         fp.write(struct.pack(">I", obj_len))
     else:
@@ -151,14 +165,15 @@ def _pack_array(obj, fp, options):
     for e in obj:
         dump(e, fp, options)
 
+
 def _pack_map(obj, fp, options):
     obj_len = len(obj)
     if obj_len < 16:
         fp.write(struct.pack("B", 0x80 | obj_len))
-    elif obj_len < 2**16:
+    elif obj_len < 2 ** 16:
         fp.write(b"\xde")
         fp.write(struct.pack(">H", obj_len))
-    elif obj_len < 2**32:
+    elif obj_len < 2 ** 32:
         fp.write(b"\xdf")
         fp.write(struct.pack(">I", obj_len))
     else:
@@ -168,13 +183,25 @@ def _pack_map(obj, fp, options):
         dump(k, fp, options)
         dump(v, fp, options)
 
+
 def _utype(obj):
     raise UnsupportedTypeException("unsupported type: {:s}".format(str(type(obj))))
 
+
 # Pack with unicode 'str' type, 'bytes' type
+# options is a dict (from __init__.dump())
 def dump(obj, fp, options):
     # return packable object if supported in umsgpack_ext, else return obj
-    obj = mpext(obj, options)  
+
+    for t in types:
+        if isinstance(obj, t):
+            ex = types[t]  # Instance or class
+            if isinstance(ex, type):  # Class: must instantiate
+                obj = ex(obj, options)
+                types[t] = obj
+            else:
+                obj = ex(obj)  # Assign the object to the Packer
+
     ext_handlers = options.get("ext_handlers")
 
     if obj is None:
@@ -222,7 +249,9 @@ def dump(obj, fp, options):
     else:
         _utype(obj)
 
+
 # Interface to __init__.py
+
 
 def dumps(obj, options):
     fp = io.BytesIO()

@@ -12,44 +12,40 @@
 import umsgpack
 import struct
 
-# Entries in mpext are required where types are to be handled without declaring
-# an ext_serializable class in the application. This example enables complex,
-# tuple and set types to be packed as if they were native to umsgpack.
-# Options (kwargs to dump and dumps) may be passed to constructor including new
-# type-specific options
-def mpext(obj, options):
-    if isinstance(obj, complex):
-        return Complex(obj)
-    if isinstance(obj, set):
-        return Set(obj)
-    if isinstance(obj, tuple):
-        return Tuple(obj)
-    if isinstance(obj, bytearray):
-        return ByteArray(obj)
-    return obj
 
-@umsgpack.ext_serializable(0x50)
-class Complex:
-    def __init__(self, c):
-        self.c = c
+class Packer:
+    def __init__(self, s, options):
+        self.s = s
+        self.options = options
+
+    def __call__(self, obj):
+        self.s = obj
+        return self
+
+
+@umsgpack.ext_serializable(0x50, complex)
+class Complex(Packer):
+    def __init__(self, s, options):
+        super().__init__(s, options)
 
     def __str__(self):
-        return "Complex({})".format(self.c)
+        return f"Complex({self.s})"
 
     def packb(self):
-        return struct.pack(">ff", self.c.real, self.c.imag)
+        return struct.pack(">ff", self.s.real, self.s.imag)
 
     @staticmethod
     def unpackb(data):
         return complex(*struct.unpack(">ff", data))
 
-@umsgpack.ext_serializable(0x51)
-class Set:
-    def __init__(self, s):
-        self.s = s
+
+@umsgpack.ext_serializable(0x51, set)
+class Set(Packer):
+    def __init__(self, s, options):
+        super().__init__(s, options)
 
     def __str__(self):
-        return "Set({})".format(self.s)
+        return f"Set({self.s})"
 
     def packb(self):  # Must change to list otherwise get infinite recursion
         return umsgpack.dumps(list(self.s))
@@ -58,13 +54,14 @@ class Set:
     def unpackb(data):
         return set(umsgpack.loads(data))
 
-@umsgpack.ext_serializable(0x52)
-class Tuple:
-    def __init__(self, s):
-        self.s = s
+
+@umsgpack.ext_serializable(0x52, tuple)
+class Tuple(Packer):
+    def __init__(self, s, options):
+        super().__init__(s, options)
 
     def __str__(self):
-        return "Tuple({})".format(self.s)
+        return f"Tuple({self.s})"
 
     def packb(self):
         return umsgpack.dumps(list(self.s))  # Infinite recursion
@@ -73,13 +70,14 @@ class Tuple:
     def unpackb(data):
         return tuple(umsgpack.loads(data))
 
-@umsgpack.ext_serializable(0x53)
-class ByteArray:
+
+@umsgpack.ext_serializable(0x53, bytearray)
+class ByteArray(Packer):
     def __init__(self, s):
-        self.s = s
+        super().__init__(s, options)
 
     def __str__(self):
-        return "ByteArray({})".format(self.s)
+        return f"ByteArray({self.s})"
 
     def packb(self):
         return umsgpack.dumps(bytes(self.s))
