@@ -6,7 +6,7 @@ data. The protocol achieves a substantial reduction in data volume. Its
 combination of ease of use, extensibility, and packing performance makes it
 worth considering in any application where data volume is an issue.
 
-This MicroPython implementation has usage identical to that of the `ujson`
+This MicroPython implementation has usage identical to that of the `json`
 library:
 ```python
 import umsgpack
@@ -60,7 +60,7 @@ following:
  if it is encoded as a `tuple` it will be decoded as one.
  * `complex`
  * `set`
- * `bytearray`
+ * `bytearray` Provides an explicit distinction between `bytes` and `byterray`.
 
 
 
@@ -83,6 +83,19 @@ result on 32 bit and 64 bit platforms.
 If large quantities of text are to be transmitted, a greater gain could be
 achieved by compressing the text with a `gzip` style compressor and serialising
 the resultant `bytes` object with MessagePack.
+
+## 1.3 Update
+
+The means of handling extended built-in types (such as `complex`) has changed.
+This had the following objectives:
+* Remove the `mpext` function.
+* Extension modules are now loaded by the application. This enables the use of
+multiple extension modules.
+* Extension classes are now instantiated on demand, and then once only, reducing
+RAM churn.
+* The old "Ext handlers" approach has been removed.
+
+The update affects the design of extension modules (formerly `umsgpack_ext.py`).
 
 # 2. The MicroPython implementation
 
@@ -112,7 +125,8 @@ ext types. As stated above, timestamps are unsupported.
 
 The repository includes `umsgpack/umsgpack_ext.py` which optionally extends the
 library to support Python `set`, `complex`, `tuple` and `bytearray` objects.
-The aim is to show how this can easily be extended to include further types.
+The aim is to show how this can easily be extended to include further uilt-in
+types.
 
 This MicroPython version uses various techniques to minimise RAM use including
 "lazy imports": a module is only imported on first usage. For example an
@@ -197,9 +211,9 @@ The API supports the following methods:
  5. `aload(fp, **options)` Asynchronous unpack of data from a `StreamReader`.
  See [section 7](./README.md#7-asynchronous-use).
 
-The options are discussed below. Most are rather specialised. I am unsure if
-there is a practical use case for `ext_handlers`: an easier way is to use
-[the ext_serializable decorator](./README.md#61-the-ext_serializable-decorator).
+The options are discussed below. Most are rather specialised. The `ext_handlers`
+option has been removed in favour of the simpler
+[ext_serializable decorator](./README.md#61-the-ext_serializable-decorator).
 
 ## 4.1 Load options
 
@@ -210,10 +224,7 @@ there is a practical use case for `ext_handlers`: an easier way is to use
  `dict`. (default `False`).
  3. `use_tuple` (bool): unpacks arrays into tuples, instead of lists (default
  `False`). The extension module (if used) makes this redundant.
- 4. `ext_handlers`: a dictionary of Ext handlers, mapping integer Ext type to a
- callable that unpacks an instance of Ext into an object. See
- [section 8](./README.md#8-ext-handlers).
- 5. `observer` (aload only): an object with an update() method, which is
+ 4. `observer` (aload only): an object with an update() method, which is
  called with the results of each readexactly(n) call. This could be used, for
  example, to calculate a CRC value on the received message data.
 
@@ -224,39 +235,50 @@ arg.
 
 ## 4.2 Dump options
 
-`dump` and `dumps` support the following options as keyword args:  
+`dump` and `dumps` support the following option as keyword args:  
 
  1. `force_float_precision` (str): `"single"` to force packing floats as
  IEEE-754 single-precision floats, `"double"` to force packing floats as
  IEEE-754 double-precision floats. By default the precision of the target's
  firmware is detected and used.
- 2. `ext_handlers` (dict): dictionary of Ext handlers, mapping a custom type
- to a callable that packs an instance of the type into an Ext object. See
- [section 8](./README.md#8-ext-handlers).
 
-# 5. Extension module
+# 5. Extension modules: additional built-in types
 
-The `umsgpack_ext` module extends `umsgpack` to support `complex`, `set` and
-`tuple` types, but its design facilitates adding further Python built-in types
-or types supported by other libraries. Support is entirely transparent to the
-application: the added types behave in the same way as native types.
+These extend MessagePack to handle further built-in data types. Each module
+supports one data type; importing a module enables that support. Currently the
+following types are supported:
+* `set`
+* `complex`
+* `tuple` Natively `tuple` instances unpack as `list` objects. This module enables
+`tuple` and `list` data types to be preserved.
+* `bytearray` By default a `bytearray` decodes as a `bytes` object. This module
+remedies this.
 
+The following enables support for `byterray`, `set`, `complex` and `tuple` and
+illustrates saving and restoring a `set`.
+```py
+import umsgpack
+from umsgpack import mpk_bytearray, mpk_set, mpk_complex, mpk_tuple
+umsgpack.dumps({1,2,3})
+# Outcome: b'\xd6Q\x93\x03\x01\x02'
+umsgpack.loads(b'\xd6Q\x93\x03\x01\x02')
+# Outcome {1, 2, 3}
+```
 The following examples may be pasted at the REPL:
 ```python
 import umsgpack
+from umsgpack import mpk_complex
 with open('data', 'wb') as f:
-   umsgpack.dump(1 + 4j, f)  # mpext() handles extension type
+   umsgpack.dump(1 + 4j, f)
 ```
 Reading back:
 ```python
 import umsgpack
+from umsgpack import mpk_complex
 with open('data', 'rb') as f:
     z = umsgpack.load(f)
-print(z)  # z is complex
+print(z)  # prints (1+4j)
 ```
- The file `umsgpack_ext.py` may be found in the `umsgpack` directory. To extend
- it to support additional types, see
-[section 11](./README.md#11-notes-on-the-extension-module).
 
 # 6. Serialisable user classes
 
@@ -350,25 +372,14 @@ values. Consequently a unique delimiter is unavailable.
 
 MessagePack messages are binary sequences whose length is unknown to the
 receiver. Further, in many case a substantial amount of the message must be
-read before the total length can be deduced. The solution adopted is to add an
-`aload()` method that accepts data from a `StreamReader`, decoding it as it
-arrives. The following is an example of an asynchronous reader:
-```python
-async def receiver():
-    sreader = asyncio.StreamReader(uart)
-    while True:
-        res = await umsgpack.aload(sreader)
-        print('Recieved', res)
-```
-
-Alternatively, instead of using the `aload()` method, an `aloader` class can be
-instantiated and utilized. For example:
+read before the total length can be deduced. The `aloader` class is
+instantiated with a `StreamReader`: incoming data is unpacked and objects
+retrieved using an asynchronous iterator:
 ```python
 async def receiver():
     uart_aloader = umsgpack.aloader(asyncio.StreamReader(uart))
-    while True:
-        res = await uart_aloader.load()
-        print('Received', res)
+    async for item in uart_aloader:
+        print('Received', item)
 ```
 
 The demo `asyntest.py` runs on a Pyboard with pins X1 and X2 linked. See code
@@ -377,71 +388,7 @@ RAM overhead.
 
 The demo `asyntest_py3_serial.py` is similar, but meant to run on a computer with full python3.
 
-# 8. Ext Handlers
-
-This is an alternative to the `ext_serializable` decorator and provides another
-option for extending MessagePack. In my view it is rather clunky and I struggle
-to envisage a use case. It is included for completeness.
-
-The packing functions accept an optional `ext_handlers` dictionary that maps
-custom types to callables that pack the type into an Ext object. The callable
-should accept the custom type object as an argument and return a packed
-`umsgpack.Ext` object.
-
-Example for packing `set` and `complex` types into Ext objects with type codes
-0x20 and 0x30:
-
-```python
-umsgpack.dumps([1, True, {"foo", 2}, complex(3, 4)],
-    ext_handlers = {
-       set: lambda obj: umsgpack.Ext(0x20, umsgpack.dumps(list(obj))),
-       complex: lambda obj: umsgpack.Ext(0x30, struct.pack("ff", obj.real, obj.imag))
-       })
-```
-
-Similarly, the unpacking functions accept an optional `ext_handlers` dictionary
-that maps Ext type codes to callables that unpack the Ext into a custom object.
-The callable should accept a `umsgpack.Ext` object as an argument and return an
-unpacked custom type object.
-
-Example for unpacking Ext objects with type codes 0x20, and 0x30 into `set` and
-`complex` objects:
-
-``` python
-umsgpack.loads(s,
-    ext_handlers = {
-      0x20: lambda ext: set(umsgpack.loads(ext.data)),
-      0x30: lambda ext: complex(*struct.unpack("ff", ext.data)),
-    })
-```
-
-Example for packing and unpacking a custom class:
-
-``` python
-class Point(object):
-    def __init__(self, x, y, z):
-        self.x = x
-        self.y = y
-        self.z = z
-
-    def __str__(self):
-        return "Point({}, {}, {})".format(self.x, self.y, self.z)
-
-    def pack(self):
-        return struct.pack(">iii", self.x, self.y, self.z)
-
-    @staticmethod
-    def unpack(data):
-        return Point(*struct.unpack(">iii", data))
-
-# Pack
-obj = Point(1,2,3)
-data = umsgpack.dumps(obj, ext_handlers = {Point: lambda obj: umsgpack.Ext(0x10, obj.pack())})
-
-# Unpack
-obj = umsgpack.loads(data, ext_handlers = {0x10: lambda ext: Point.unpack(ext.data)})
-```
-# 9. Exceptions
+# 8. Exceptions
 
 These are defined in `umsgpack/__init__.py`.
 
@@ -474,7 +421,7 @@ class DuplicateKeyException(UnpackException):
     "Duplicate key encountered during map unpacking."
 ```
 
-# 10. Test suite
+# 9. Test suite
 
 This is mainly of interest to those wanting to modify the code.
 
@@ -486,7 +433,7 @@ errors when compiled under even the Unix build of MicroPython. The file
 that `complex` and `set` are not supported. The script `run_test_suite` renames
 `umsgpack_ext.py`, runs the tests and restores the file.
 
-# 11. Changes for MicroPython
+# 10. Changes for MicroPython
 
 Code in this repo is based on
 [this implementation](https://github.com/vsergeev/u-msgpack-python), whose code
@@ -512,23 +459,49 @@ Method of detecting platform's float size changed (MicroPython does not support
 the original method).  
 Version reset to (0.1.0).
 
-# 12. Notes on the extension module
+# 11. Notes on the extension module
 
 These notes are for those wishing to understand how this works, perhaps to add
-support for further types.
+support for further types. Consider this code which adds support for complex
+numbers:
+```py
+import umsgpack
+import struct
+from . import Packer
 
-The `mp_dump.py` attempts to load a function `mpext` from the module. If this
-fails (becuase the module is missing) it creates a dummy function. When the
-`dump` method runs, it executes `mpext` passing the object to be encoded. If
-the type of the object matches one support by the extension, it returns an
-instance of a serialisable class created with the passed object. If the type
-does not match, the passed object is returned for `dump` to inspect.
 
-Supporting additional types therefore comprises the following:
- 1. Create an `ext_serializable` class for the new type as per
- [section 6.1](./README.md#61-the-ext_serializable-decorator).
- 2. Change the function `mpext` to check for the new type and, if found, return
- an instance of the above class.
+@umsgpack.ext_serializable(0x50, complex)
+class Complex(Packer):
+    def __init__(self, s, options):
+        super().__init__(s, options)
+
+    def __str__(self):
+        return f"Complex({self.s})"
+
+    def packb(self):
+        return struct.pack(">ff", self.s.real, self.s.imag)
+
+    @staticmethod
+    def unpackb(data):
+        return complex(*struct.unpack(">ff", data))
+```
+The `ext_serializable` decorator takes two args, the `ext_type` integer value
+which represents the record type, and the class to be encoded. The `ext_type`
+value should be unique to this class.
+
+The class `Complex` must be subclassed from `Packer`. Its name is arbitrary.
+When the class is instantiated it receives an instance of a `complex` number
+followed by a `dict` of options (as passed to `load` or `dump`). In the case of
+`Complex` these are ignored.
+
+The `__str__` method is used in error reporting and "pretty prints" `self.s`:
+this holds the value being dumped.
+
+The `packb` method converts the data, returning a `bytes` instance.
+
+The `unpackb` staticmethod accepts a `bytes` instance as created by `packb` and
+returns an instance of the supported class.
+
 
 ## Acknowledgements
 
