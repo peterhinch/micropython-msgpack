@@ -117,13 +117,12 @@ def _unpack_ext(code, fp, options):
     ext_data = _read_except(fp, length)
 
     # Unpack with ext classes, if type is registered
-    if ext_type in ext_type_to_class:
+    if ext_type in packers:
+        cls = packers[ext_type]
         try:
-            return ext_type_to_class[ext_type].unpackb(ext_data)
+            return cls.unpackb(ext_data, options)
         except AttributeError:
-            raise NotImplementedError(
-                "Ext class {:s} lacks unpackb()".format(repr(ext_type_to_class[ext_type]))
-            )
+            raise NotImplementedError(f"Ext class {repr(cls)} lacks unpackb()")
     raise UnsupportedTypeException(f"ext_type: 0x{ext_type:0X}")
 
 
@@ -169,11 +168,9 @@ def _unpack_map(code, fp, options):
         try:
             hash(k)
         except:
-            raise UnhashableKeyException('unhashable key: "{:s}"'.format(str(k)))
+            raise UnhashableKeyException(f'"{str(k)}"')
         if k in d:
-            raise DuplicateKeyException(
-                'duplicate key: "{:s}" ({:s})'.format(str(k), str(type(k)))
-            )
+            raise DuplicateKeyException(f'"{str(k)}" ({type(k)})')
 
         # Unpack value
         v = mpload(fp, options)
@@ -181,7 +178,7 @@ def _unpack_map(code, fp, options):
         try:
             d[k] = v
         except TypeError:
-            raise UnhashableKeyException('unhashable key: "{:s}"'.format(str(k)))
+            raise UnhashableKeyException(f'"{str(k)}"')
     return d
 
 
@@ -215,10 +212,14 @@ def mpload(fp, options):
     return _unpack_map(code, fp, options)
 
 
-# Interface to __init__.py
+# API
 
 
-def mploads(s, options):
+def load(fp, **options):
+    return mpload(fp, options)
+
+
+def loads(s, **options):
     if not isinstance(s, (bytes, bytearray)):
-        raise TypeError("packed data must be type 'bytes' or 'bytearray'")
+        raise TypeError("Need 'bytes' or 'bytearray'")
     return mpload(io.BytesIO(s), options)

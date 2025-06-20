@@ -4,7 +4,7 @@
 Where JSON produces human readable strings, MessagePack produces binary `bytes`
 data. The protocol achieves a substantial reduction in data volume. Its
 combination of ease of use, extensibility, and packing performance makes it
-worth considering in any application where data volume is an issue.
+worth considering in any application where these capabilities are of use.
 
 This MicroPython implementation has usage identical to that of the `json`
 library:
@@ -12,6 +12,7 @@ library:
 import umsgpack
 obj = [1, 2, 3.14159]
 s = umsgpack.dumps(obj)  # s is a bytes object
+print(umsgpack.loads(s))  # Outcome [1, 2, 3.14159]
 ```
 MessagePack efficiently serialises a range of Python built-in types, a range
 that can readily be extended to support further Python types or instances of
@@ -25,12 +26,13 @@ with open('data', 'rb') as f:
     z = umsgpack.load(f)
 print(z)  # z might be a wide range of Python objects
 ```
-The protocol is self describing even when extended. The file
-`umsgpack/umsgpack_ext.py` extends support to `complex`, `tuple` and `set`
-built-in types. Provided that file exists on the target, the code above will
-work even if the data includes such objects. Extension can be provided in a way
-that is transparent to the application.
-
+The protocol is self describing even when extended. Extended usage is simply a
+matter of importing the relevant library:
+```python
+import umsgpack, umsgpack.mpk_complex  # Add complex support
+s = umsgpack.dumps([1, "abc", 1+9j])
+print(umsgpack.loads(s))  # Outcome [1, 'abc', (1+9j)]
+```
 This document focuses on usage with MicroPython and skips most of the detail on
 how MessagePack works. The
 [source document](https://github.com/vsergeev/u-msgpack-python) provides a lot
@@ -54,17 +56,39 @@ The following types are natively supported.
 The `list` and `dict` types may contain any supported type including `list` and
 `dict` instances (ad nauseam).
 
-The file `umsgpack_ext.py` (in `umsgpack` directory) extends this to add the
-following:
+Extended support currently adds the following options:
  * `tuple` Provides an explicit distinction between `tuple` and `list` types:
  if it is encoded as a `tuple` it will be decoded as one.
  * `complex`
  * `set`
  * `bytearray` Provides an explicit distinction between `bytes` and `byterray`.
 
+This document details how to support further built-in types and/or user-defined
+classes.
 
+## 1.2 Library Update
 
-## 1.2 Performance
+A substantial update has been undertaken to V0.2.0. For users of "advanced"
+features (extension and asynchronous use) this is a breaking change. Objectives
+were to save RAM by removing unnecessary features and simplifying code. PEP5
+compliance has been improved.
+
+### 1.2.1 Extended built-in classes
+
+The ext handler approach (formerly an option) has been discarded. Extension is
+exclusively via an enhanced `ext_serializable` decorator. The `mpext` function
+has been discarded. This enables each extension class to be handled by a separate
+Python file, improving modularity, reducing RAM use, and easing the addition of
+new classes. In consequence the old `umsgpack_ext.py` is replaced by individual
+files such as `umsgpack.mpk_set.py`. Other improvements minimise object creation
+when packing extended built-ins.
+
+### 1.2.2 Asynchronous unpacking
+
+This now has an option for an asynchronous iterator. The `observer` object can
+now be any callable (a callback or a class).
+
+## 1.3 Compression performance
 
 The degree of compression compared to UJSON depends on the object being
 serialised. The following gives an example:
@@ -83,19 +107,6 @@ result on 32 bit and 64 bit platforms.
 If large quantities of text are to be transmitted, a greater gain could be
 achieved by compressing the text with a `gzip` style compressor and serialising
 the resultant `bytes` object with MessagePack.
-
-## 1.3 Update
-
-The means of handling extended built-in types (such as `complex`) has changed.
-This had the following objectives:
-* Remove the `mpext` function.
-* Extension modules are now loaded by the application. This enables the use of
-multiple extension modules.
-* Extension classes are now instantiated on demand, and then once only, reducing
-RAM churn.
-* The old "Ext handlers" approach has been removed.
-
-The update affects the design of extension modules (formerly `umsgpack_ext.py`).
 
 # 2. The MicroPython implementation
 
@@ -123,10 +134,6 @@ Supported types are fully compliant with a subset of the latest
 In particular, it supports the new binary, UTF-8 string and application-defined
 ext types. As stated above, timestamps are unsupported.
 
-The repository includes `umsgpack/umsgpack_ext.py` which optionally extends the
-library to support Python `set`, `complex`, `tuple` and `bytearray` objects.
-The aim is to show how this can easily be extended to include further uilt-in
-types.
 
 This MicroPython version uses various techniques to minimise RAM use including
 "lazy imports": a module is only imported on first usage. For example an
@@ -137,9 +144,9 @@ code to dump data or that to support asynchronous programming.
 
 The un-extended module conforms to the MessagePack specification. Consequently
 messages may be exchanged between systems using different MessagePack modules
-including applications written in non-Python languages. If the extension module
-is to be used in such applications, a matching extension will be required by
-the foreign language party.
+including applications written in non-Python languages. If extension modules are
+to be used in such applications, a matching extension will be required by the
+foreign language party.
 
 The MessagePack specification does not distinguish between mutable and
 immutable types. Consequently the non-extended module will be unable to
@@ -161,18 +168,19 @@ The following files are installed by `mpremote`:
 1. `umsgpack/__init__.py` Necessary library support.  
 2. `umsgpack/mp_dump.py` Supports `dump` and `dumps` commands.  
 3. `umsgpack/mp_load.py` Supports `load` and `loads` commands.  
-4. `umsgpack/as_load.py` Support for `aload` command (asynchronous load).  
-5. `umsgpack/as_loader.py` Supports `aloader` asynchronous loader class.  
-6. `umsgpack/umsgpack_ext.py` Extends MessagePack to support `complex`, `set` and `tuple`.  
-7. `asyntest.py` Demo of asynchronous use of MessagePack.  
-8. `user_class.py` Demo of a user defined class that is serialisable by messagePack.  
+4. `umsgpack/as_loader.py` Supports `ALoader` asynchronous loader class.  
+5. `umsgpack/mpk_bytearray.py` Extends support to `bytearray`.  
+6. `umsgpack/mpk_complex.py` Extends support to `complex`.  
+7. `umsgpack/mpk_set.py` Extends support to `set`.  
+8. `umsgpack/mpk_tuple.py` Extends support to `tuple`.  
+9. `asyntest.py` Demo of asynchronous use of MessagePack.  
+10. `user_class.py` Demo of a user defined class that is serialisable by messagePack.  
 
 In a minimal installation only items 1-3 are required.
 
 Additional files:
 1. `asyntest_py3_serial` Demo of running the library on a PC.
-2. `run_test_suite` Bash script to run the full test suite.
-3. `test_umsgpack.py` The actual full test suite.
+2. `test_umsgpack.py` The full test suite.
 
 See [section 10](./README.md#10-test-suite) for details of the test suite.
 
@@ -188,12 +196,8 @@ The following optional files may also be copied to the target:
  * `user_class.py` A serialisable user class.
  * `asyntest.py` Demo of asynchronous use. See [section 7](./README.md#7-asynchronous-use).
 
-The files `run_test_suite` and `test_umsgpack.py` comprise the test suite which
-runs on a PC. See [section 9](./README.md#9-test-suite).
-
-If RAM usage is to be minimised, the file `umsgpack/umsgpack_ext.py` may be
-deleted from the target with loss of its additional type support. Its overhead
-is about 2KiB measured on a Pyboard with no frozen bytecode.
+The file `test_umsgpack.py` is the test suite which runs on a PC. See
+[section 9](./README.md#9-test-suite).
 
 # 4. API
 
@@ -208,30 +212,27 @@ The API supports the following methods:
  3. `loads(s, **options)` Deserialise a `bytes` object. Returns a Python
  object.
  4. `load(fp, **options)` Unpack data from a stream or file.
- 5. `aload(fp, **options)` Asynchronous unpack of data from a `StreamReader`.
+ 5. `ALoader(fp, **options)` Asynchronous unpack of data from a `StreamReader`.
  See [section 7](./README.md#7-asynchronous-use).
 
-The options are discussed below. Most are rather specialised. The `ext_handlers`
-option has been removed in favour of the simpler
-[ext_serializable decorator](./README.md#61-the-ext_serializable-decorator).
+The options are discussed below. Most are rather specialised.
 
 ## 4.1 Load options
 
-`load`, `loads` and `aload` support the following options as keyword args:  
+`load`, `loads` and `ALoader` support the following options as keyword args:  
  1. `allow_invalid_utf8` (bool): unpack invalid strings into bytes (default
  `False` which causes an exception to be raised).
  2. `use_ordered_dict` (bool): unpack dicts into `OrderedDict`, instead of
  `dict`. (default `False`).
  3. `use_tuple` (bool): unpacks arrays into tuples, instead of lists (default
- `False`). The extension module (if used) makes this redundant.
- 4. `observer` (aload only): an object with an update() method, which is
- called with the results of each readexactly(n) call. This could be used, for
- example, to calculate a CRC value on the received message data.
+ `False`). The `mpk_tuple` module (if used) makes this redundant.
+ 4. `observer` (ALoader only): a `callable` (a function or an object with a
+ `__call()__` method) which is called with the results of each `readexactly(n)`
+ call. This could be used, for example, to calculate a CRC value on the received
+ message data.
 
 Work is in progress to make `dict` instances ordered by default, so option 2
-may become pointless. The `umsgpack_ext` module enables tuples to be encoded in
-a different format to lists which is more flexible than the global `use_tuple`
-arg.
+may become pointless.
 
 ## 4.2 Dump options
 
@@ -279,24 +280,16 @@ with open('data', 'rb') as f:
     z = umsgpack.load(f)
 print(z)  # prints (1+4j)
 ```
+# 6 Extending umsgpack
 
-# 6. Serialisable user classes
+This is done via the `ext_serializable` decorator which is used in two ways: to
+create serialisable user classes and to support additional built-in types.
 
-An example of a serialisable user class may be found in `user_class.py`. It
+## 6.1 Serialisable user classes
+
+This example of a serialisable user class may be found in `user_class.py`. It
 provides a `Point3d` class representing a point in 3D space stored as three
-`float` values. It may be run as follows (paste at the REPL):
-```python
-import umsgpack
-from user_class import Point3d
-p = Point3d(1.0, 2.1, 3)
-s = umsgpack.dumps(p)
-print(umsgpack.loads(s))
-```
-
-## 6.1 The ext_serializable decorator
-
-This provides a simple way of extending MessagePack to include additional
-types. The following is the contents of `user_class.py`:
+`float` values.
 ```python
 import umsgpack
 import struct
@@ -307,7 +300,7 @@ class Point3d:
         self.v = (float(x), float(y), float(z))
 
     def __str__(self):
-        return "Point3d({} {} {})".format(*self.v)
+        return "Point3d({:5.2f} {:5.2f} {:5.2f})".format(*self.v)
 
     def packb(self):
         return struct.pack(">fff", *self.v)
@@ -316,31 +309,69 @@ class Point3d:
     def unpackb(data):
         return Point3d(*struct.unpack(">fff", data))
 ```
-A class defined with the decorator must provide the following methods:
- * Constructor: stores the object to be serialised.
- * `packb` This returns a `bytes` instance containing the serialised object.
- * `unpackb` Defined as a static method, this accepts a `bytes` instance of
- packed data and returns a new instance of the unpacked data type.
+The single arg to `ext_serializable` is the extension type: this is an arbitrary
+byte value which must be unique to the application. The `packb` and `unpackb`
+methods specify how the object is to be packed by `struct`. The `packb` method
+must return a `bytes` object and `unpackb` returns a new instance of the class.
 
-Typically this packing and unpacking is done using the `struct` module, but in
-the some simple cases it may be done by umsgpack itself. The following, taken
-from the extension module, illustrates support for `complex`:
+It may be run as follows (paste at the REPL):
 ```python
-@umsgpack.ext_serializable(0x50)
-class Complex:
-    def __init__(self, c):
-        self.c = c
+import umsgpack
+from user_class import Point3d
+p = Point3d(1.0, 2.1, 3)
+s = umsgpack.dumps(p)
+print(umsgpack.loads(s))  # Outcome Point3d( 1.00  2.10  3.00)
+```
 
-    def __str__(self):
-        return "Complex({})".format(self.c)
+## 6.2 Adding built-in types
+
+The following is the contents of `mpk_complex.py`:
+```python
+import umsgpack
+import struct
+from . import Packer
+
+
+@umsgpack.ext_serializable(0x50, complex)
+class Complex(Packer):
+    def __init__(self, s, options):
+        super().__init__(s, options)
 
     def packb(self):
-        return struct.pack(">ff", self.c.real, self.c.imag)
+        return struct.pack(">ff", self.s.real, self.s.imag)
 
     @staticmethod
     def unpackb(data):
         return complex(*struct.unpack(">ff", data))
 ```
+The decorator takes two args, the extension type and the type to be handled.
+A class defined with the two-arg decorator must be subclassed from `Packer` and
+must provide the following methods:
+
+ * Constructor: Takes two args, an instance of the type to be serialised and a
+ `dict` of pack options. The latter is stored in a bound variable `.options`.
+ * `packb` This returns a `bytes` instance containing the serialised object. The
+ method can optionally access `.options`.
+ * `unpackb` Defined as a static method, this accepts a `bytes` instance of
+ packed data and returns a new instance of the unpacked data type.
+
+Typically this packing and unpacking is done using the `struct` module, but in
+the some simple cases it may be done by `umsgpack` itself. For example
+`mpk_set.py`:
+```py
+@umsgpack.ext_serializable(0x51, set)
+class Set(Packer):
+    def __init__(self, s, options):
+        super().__init__(s, options)
+
+    def packb(self):  # Pack as a list
+        return umsgpack.dumps(list(self.s))
+
+    @staticmethod
+    def unpackb(data):
+        return set(umsgpack.loads(data))  # Cast to set
+```
+Contributions of new built-in serialisers are welcome.
 
 # 7. Asynchronous use
 
@@ -371,13 +402,13 @@ MessagePack is a binary protocol so the data may include all possible byte
 values. Consequently a unique delimiter is unavailable.
 
 MessagePack messages are binary sequences whose length is unknown to the
-receiver. Further, in many case a substantial amount of the message must be
-read before the total length can be deduced. The `aloader` class is
+receiver. Further, in many cases a substantial amount of the message must be
+read before the total length can be deduced. The `ALoader` class is
 instantiated with a `StreamReader`: incoming data is unpacked and objects
 retrieved using an asynchronous iterator:
 ```python
 async def receiver():
-    uart_aloader = umsgpack.aloader(asyncio.StreamReader(uart))
+    uart_aloader = umsgpack.ALoader(asyncio.StreamReader(uart))
     async for item in uart_aloader:
         print('Received', item)
 ```
@@ -428,10 +459,11 @@ This is mainly of interest to those wanting to modify the code.
 The repo includes the test suite `test_umsgpack.py` which must be run under
 Python 3 in a directory containing the `umsgpack` tree. It will not run under
 MicroPython because it tests large data types: the test suite causes memory
-errors when compiled under even the Unix build of MicroPython. The file
-`umsgpack_ext.py` should not be present: this is because the test suite assumes
-that `complex` and `set` are not supported. The script `run_test_suite` renames
-`umsgpack_ext.py`, runs the tests and restores the file.
+errors when run under even the Unix build of MicroPython. To run the test suite
+issue:
+```bash
+$ python3 test_umsgpack.py
+```
 
 # 10. Changes for MicroPython
 
@@ -451,15 +483,12 @@ Timestamps removed.
 Converted to Python package with lazy import to save RAM.  
 Provide asyncio StreamReader support.
 Exported functions now match ujson: dump, dumps, load, loads (only).  
-Many functions refactored to save bytes, e.g. replacing the function dispatch
-table with code.  
-Further refactoring to reduce allocations.  
+Many functions refactored to save bytes.  
 `InvalidString` class removed because it is a subclass of a native type.  
 Method of detecting platform's float size changed (MicroPython does not support
 the original method).  
-Version reset to (0.1.0).
 
-# 11. Notes on the extension module
+# 11. Notes on extension classes
 
 These notes are for those wishing to understand how this works, perhaps to add
 support for further types. Consider this code which adds support for complex
@@ -475,9 +504,6 @@ class Complex(Packer):
     def __init__(self, s, options):
         super().__init__(s, options)
 
-    def __str__(self):
-        return f"Complex({self.s})"
-
     def packb(self):
         return struct.pack(">ff", self.s.real, self.s.imag)
 
@@ -487,21 +513,22 @@ class Complex(Packer):
 ```
 The `ext_serializable` decorator takes two args, the `ext_type` integer value
 which represents the record type, and the class to be encoded. The `ext_type`
-value should be unique to this class.
+value should be a byte unique to this class.
 
-The class `Complex` must be subclassed from `Packer`. Its name is arbitrary.
-When the class is instantiated it receives an instance of a `complex` number
-followed by a `dict` of options (as passed to `load` or `dump`). In the case of
-`Complex` these are ignored.
+The class `Complex` must be subclassed from `Packer`. The name `Complex` is
+arbitrary. When the class is instantiated it receives an instance of a `complex`
+number followed by a `dict` of options as passed to `dump` or `dumps`. The
+`Packer` stores this `dict` in a `.options` bound variable, enabling access by
+`.packb`. In the case of `Complex` the options are ignored.
 
-The `__str__` method is used in error reporting and "pretty prints" `self.s`:
-this holds the value being dumped.
-
-The `packb` method converts the data, returning a `bytes` instance.
+The `packb` method converts the data, returning a `bytes` instance. The `Packer`
+class ensures that the subclass is only instantiated once even in a dump
+containing multiple instances of the supported class. This is achieved via an
+`__call__` method.
 
 The `unpackb` staticmethod accepts a `bytes` instance as created by `packb` and
-returns an instance of the supported class.
-
+returns an instance of the supported class. There is currently no support for
+unpack options.
 
 ## Acknowledgements
 

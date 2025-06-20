@@ -12,12 +12,9 @@ class ByteArray(Packer):
     def __init__(self, s, options):
         super().__init__(s, options)
 
-    def __str__(self):
-        return f"ByteArray({self.s})"
-
     def packb(self):
         return umsgpack.dumps(bytes(self.s))
 
     @staticmethod
-    def unpackb(data):
+    def unpackb(data, options):
         return bytearray(umsgpack.loads(data))

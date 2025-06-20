@@ -12,12 +12,9 @@ class Set(Packer):
     def __init__(self, s, options):
         super().__init__(s, options)
 
-    def __str__(self):
-        return f"Set({self.s})"
-
     def packb(self):  # Must change to list otherwise get infinite recursion
         return umsgpack.dumps(list(self.s))
 
     @staticmethod
-    def unpackb(data):
+    def unpackb(data, options):
         return set(umsgpack.loads(data))

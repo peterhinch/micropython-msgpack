@@ -24,7 +24,7 @@
 # Method of detecting platform's float size changed.
 # Version reset to (0.1.0).
 
-__version__ = (0, 1, 3)
+__version__ = (0, 2, 0)
 
 # ABC for classes which handle extended Python built-in classes.
 class Packer:
@@ -41,9 +41,15 @@ class Packer:
 # Ext Serializable Decorator
 ##############################################################################
 
-custom = {}  # Pack. Key: Custom class. Value: ext_type integer.
-ext_type_to_class = {}  # Unpack. Key: ext_type integer Value: Packer subclass.
-types = {}  # Pack. Key: data type to pack Value: ext_type integer.
+# Global dicts
+# Packer
+custom = {}  # Pack custom. Key: Custom class. Value: ext_type integer.
+builtins = {}  # Pack built-in. Key: data type to pack
+# Value: (ext_type byte, Packer class).
+# The second item is replaced with Packer instance once one exists.
+
+# Unpacker
+packers = {}  # Key: ext_type integer Value: Packer subclass.
 
 # Decorator. Args:
 # ext_type: An integer identifying the packed record.
@@ -55,10 +61,10 @@ def ext_serializable(ext_type: int, example=None):
             raise TypeError("Ext type is not type integer")
         elif not (-128 <= ext_type <= 127):
             raise ValueError("Ext type value {:d} is out of range of -128 to 127".format(ext_type))
-        elif ext_type in ext_type_to_class:
+        elif ext_type in packers:
             raise ValueError(
                 "Ext type {:d} already registered with class {:s}".format(
-                    ext_type, repr(ext_type_to_class[ext_type])
+                    ext_type, repr(packers[ext_type])
                 )
             )
         elif cls in custom:
@@ -66,88 +72,71 @@ def ext_serializable(ext_type: int, example=None):
                 "Class {:s} already registered with Ext type {:d}".format(repr(cls), ext_type)
             )
 
-        ext_type_to_class[ext_type] = cls  # For unpack
+        packers[ext_type] = cls  # For unpack
         if example is None:  # Custom class
             custom[cls] = ext_type
         else:  # Extension type having a Packer class
-            types[example] = (cls, ext_type)
+            builtins[example] = (cls, ext_type)
         return cls
 
     return wrapper
 
 
-##############################################################################
 # Exceptions
-##############################################################################
 
 # Base Exception classes
 class PackException(Exception):
-    "Base class for exceptions encountered during packing."
+    pass
 
 
 class UnpackException(Exception):
-    "Base class for exceptions encountered during unpacking."
+    pass
 
 
 # Packing error
 class UnsupportedTypeException(PackException):
-    "Object type not supported for packing."
+    pass
 
 
 # Unpacking error
 class InsufficientDataException(UnpackException):
-    "Insufficient data to unpack the serialized object."
+    pass
 
 
 class InvalidStringException(UnpackException):
-    "Invalid UTF-8 string encountered during unpacking."
+    pass
 
 
 class ReservedCodeException(UnpackException):
-    "Reserved code encountered during unpacking."
+    pass
 
 
 class UnhashableKeyException(UnpackException):
-    """
-    Unhashable key encountered during map unpacking.
-    The serialized map cannot be deserialized into a Python dictionary.
-    """
+    pass
 
 
 class DuplicateKeyException(UnpackException):
-    "Duplicate key encountered during map unpacking."
+    pass
 
 
-##############################################################################
-# Lazy module load to save RAM: takes about 20μs on Pyboard 1.x after initial load
-##############################################################################
+# Lazy loader
 
+_attrs = {
+    "load": "mp_load",
+    "loads": "mp_load",
+    "dump": "mp_dump",
+    "dumps": "mp_dump",
+    "ALoader": "as_loader",
+}
 
-def load(fp, **options):
-    from . import mp_load
-
-    return mp_load.mpload(fp, options)
-
-
-def loads(s, **options):
-    from . import mp_load
-
-    return mp_load.mploads(s, options)
-
-
-def dump(obj, fp, **options):
-    from . import mp_dump
-
-    mp_dump.mpdump(obj, fp, options)
-
-
-def dumps(obj, **options):
-    from . import mp_dump
-
-    return mp_dump.mpdumps(obj, options)
-
-
-def aloader(fp, **options):
-    from . import as_loader
-
-    return as_loader.asloader(fp, options)
+# Copied from asyncio.__init__.py
+# Lazy loader, effectively does:
+#   global attr
+#   from .mod import attr
+def __getattr__(attr):
+    mod = _attrs.get(attr, None)
+    if mod is None:
+        raise AttributeError(attr)
+    value = getattr(__import__(mod, globals(), None, True, 1), attr)
+    globals()[attr] = value
+    return value

@@ -6,17 +6,18 @@
 import umsgpack
 import struct
 
+
 @umsgpack.ext_serializable(0x10)
 class Point3d:
     def __init__(self, x, y, z):
         self.v = (float(x), float(y), float(z))
 
     def __str__(self):
-        return "Point3d({} {} {})".format(*self.v)
+        return "Point3d({:5.2f} {:5.2f} {:5.2f})".format(*self.v)
 
     def packb(self):
         return struct.pack(">fff", *self.v)
 
     @staticmethod
-    def unpackb(data):
+    def unpackb(data, options):
         return Point3d(*struct.unpack(">fff", data))

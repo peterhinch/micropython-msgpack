@@ -12,12 +12,9 @@ class Complex(Packer):
     def __init__(self, s, options):
         super().__init__(s, options)
 
-    def __str__(self):
-        return f"Complex({self.s})"
-
     def packb(self):
         return struct.pack(">ff", self.s.real, self.s.imag)
 
     @staticmethod
-    def unpackb(data):
+    def unpackb(data, options):
         return complex(*struct.unpack(">ff", data))

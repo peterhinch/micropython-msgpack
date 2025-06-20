@@ -12,12 +12,9 @@ class Tuple(Packer):
     def __init__(self, s, options):
         super().__init__(s, options)
 
-    def __str__(self):
-        return f"Tuple({self.s})"
-
     def packb(self):
         return umsgpack.dumps(list(self.s))  # Infinite recursion
 
     @staticmethod
-    def unpackb(data):
+    def unpackb(data, options):
         return tuple(umsgpack.loads(data))

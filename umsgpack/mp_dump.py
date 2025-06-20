@@ -11,6 +11,7 @@ from collections import OrderedDict
 import io
 from . import *
 
+builtins
 # Auto-detect system float precision
 _float_precision = "single" if len(str(1 / 3)) < 13 else "double"
 
@@ -110,7 +111,11 @@ def _pack_binary(obj, fp, _):
     fp.write(obj)
 
 
-# Pack an externally handled data type.
+# Pack an externally handled data type. Args:
+# otype ext_type byte
+# odata Raw packed data from user class or extended built-in
+# fp Destination stream.
+# Sends MessagePack header followed by raw data.
 def _pack_ext(
     otype, odata, fp, tb=b"\x00\xd4\xd5\x00\xd6\x00\x00\x00\xd7\x00\x00\x00\x00\x00\x00\x00\xd8"
 ):
@@ -189,27 +194,29 @@ _dtable = {
     OrderedDict: _pack_map,  # Should not be necessary: OrderedDict is a dict
 }
 # Pack with unicode 'str' type, 'bytes' type
-# options is a dict (from __init__.dump())
+# options is a dict (from dump())
 def mpdump(obj, fp, options):
     if obj is None:
         fp.write(b"\xc0")
         return
-    # Try extension types before native types. This because extension can override
+    # Try extension builtin types before native types. This because extension can override
     # native (tuple)
-    t = next((t for t in types if isinstance(obj, t)), None)
-    if t is not None:
-        ex, v = types[t]  # Instance or class, ext_type
+    try:
+        t = next((t for t in builtins if isinstance(obj, t)))  # Retrieve matching type
+        # If there is a matching built-in, dict holds Packer class or instance, ext_type byte
+        ex, v = builtins[t]  # ex: Packer instance or class, v: ext_type
         if isinstance(ex, type):  # Class: must instantiate
-            obj = ex(obj, options)
-            types[t] = obj, v
-        else:
-            obj = ex(obj)  # Assign the object to the Packer
+            pk = ex(obj, options)  # Instantiate Packer
+            builtins[t] = pk, v  # Update dict with instance.
+        else:  # Already an instance
+            pk = ex(obj)  # Assign the object to the Packer (__call__)
         try:
-            _pack_ext(v, obj.packb(), fp)
+            _pack_ext(v, pk.packb(), fp)  # Run the Packer and prepend MessagePack header.
         except AttributeError:
             raise NotImplementedError("Class {:s} lacks packb()".format(repr(obj.__class__)))
         return
-
+    except StopIteration:
+        pass
     # Is obj a native built-in type?
     func = _dtable.get(obj.__class__, None)
     if func is not None:
@@ -221,17 +228,22 @@ def mpdump(obj, fp, options):
 
     # Look for custom class
     # custom dict: key is class, value is ext_type
-    t = next((t for t in custom if isinstance(obj, t)), None)
-    if t:
-        try:
-            _pack_ext(custom[t], obj.packb(), fp)
-            return
-        except AttributeError:
-            pass
-    _utype(obj)
+    try:
+        t = next((t for t in custom if isinstance(obj, t)))
+    except StopIteration:
+        _utype(obj)  # FAIL: unknown data type
+    try:
+        _pack_ext(custom[t], obj.packb(), fp)
+    except AttributeError:
+        _utype(obj)  # Fail
 
 
-def mpdumps(obj, options):
+# ***** API *****
+def dump(obj, fp, **options):
+    mpdump(obj, fp, options)
+
+
+def dumps(obj, **options):
     fp = io.BytesIO()
     mpdump(obj, fp, options)
     return fp.getvalue()

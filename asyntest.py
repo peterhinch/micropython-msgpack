@@ -10,7 +10,7 @@
 
 from sys import platform
 import asyncio
-import umsgpack
+import umsgpack, umsgpack.mpk_complex
 from machine import UART, Pin
 import gc
 
@@ -32,7 +32,8 @@ async def sender():
         True,
         False,
         0xFFFFFFFF,
-        {"foo": b"\x80\x01\x02", "bar": [1, 2, 3, {"a": [1, 2, 3, {}]}]},
+        1 + 1j,
+        {"foox": b"\x80\x01\x02", "bar": [1, 2, 3, {"a": [1, 2, 3, {}]}], (1, (2, 3)): 42},
         -1,
         2.12345,
     ]
@@ -56,7 +57,7 @@ class StreamObserver:
 
 
 async def receiver():
-    uart_aloader = umsgpack.aloader(asyncio.StreamReader(uart), observer=StreamObserver())
+    uart_aloader = umsgpack.ALoader(asyncio.StreamReader(uart), observer=StreamObserver())
     async for res in uart_aloader:
         print("Received (aloader):", res)
 

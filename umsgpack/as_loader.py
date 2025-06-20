@@ -1,35 +1,40 @@
-# as_loader.py Defines the asloader class, which performs lightweight
-#              asynchronous MessagePack deserialization.
-#              It's the same deserialization logic as what's in as_load.py, but
-#              using an object-oriented implementation.
+# as_loader.py Defines the ALoader class, which performs lightweight
+# asynchronous MessagePack deserialization.
 
 # Copyright (c) 2024-5 Peter Hinch
-# Refactored as_load contributed by @bapowell
+# Refactoring contributed by @bapowell
 
 import struct
 import collections
 from . import *
 
 
-class asloader:
+class ALoader:
     """Deserialize MessagePack bytes from a StreamReader into a Python object."""
-
-    def __init__(self, fp, options):
-        self.fp = fp
-        self.allow_invalid_utf8 = options.get("allow_invalid_utf8")
-        self.use_ordered_dict = options.get("use_ordered_dict")
-        self.use_tuple = options.get("use_tuple")
-        self.observer = options.get("observer")
 
     @staticmethod
     def _fail():  # Debug code should never be called.
         raise Exception("Logic error")
 
-    def __aiter__(self):  # See note below
+    @staticmethod
+    def _deep_list_to_tuple(obj):
+        if isinstance(obj, list):
+            return tuple([ALoader._deep_list_to_tuple(e) for e in obj])
+        return obj
+
+    def __init__(self, fp, **options):
+        self.fp = fp
+        self.allow_invalid_utf8 = options.get("allow_invalid_utf8")
+        self.use_ordered_dict = options.get("use_ordered_dict")
+        self.use_tuple = options.get("use_tuple")
+        self.observer = options.get("observer")
+        self.options = options  # For ext types
+
+    def __aiter__(self):  # async iterator interface
         return self
 
     async def __anext__(self):
-        return await self._unpack()
+        return await self.aload()
 
     async def _re(self, n):
         d = await self.fp.readexactly(n)
@@ -52,7 +57,7 @@ class asloader:
         try:
             s = "B >H>I>Qb >h>i>q"[off : off + 2]
         except IndexError:
-            asloader._fail()
+            ALoader._fail()
         return await self._re0(s.strip(), 1 << (ic & 3))
 
     async def _unpack_float(self, code):
@@ -61,7 +66,7 @@ class asloader:
             return await self._re0(">f", 4)
         if ic == 0xCB:
             return await self._re0(">d", 8)
-        asloader._fail()
+        ALoader._fail()
 
     async def _unpack_string(self, code):
         ic = ord(code)
@@ -74,7 +79,7 @@ class asloader:
         elif ic == 0xDB:
             length = await self._re0(">I", 4)
         else:
-            asloader._fail()
+            ALoader._fail()
 
         data = await self._re(length)
         try:
@@ -93,7 +98,7 @@ class asloader:
         elif ic == 0xC6:
             length = await self._re0(">I", 4)
         else:
-            asloader._fail()
+            ALoader._fail()
 
         return await self._re(length)
 
@@ -109,21 +114,20 @@ class asloader:
             elif ic == 0xC9:
                 length = await self._re0(">I", 4)
             else:
-                asloader._fail()
+                ALoader._fail()
 
         ext_type = await self._re0("b", 1)
         ext_data = await self._re(length)
 
         # Unpack with ext classes, if type is registered
-        if ext_type in ext_type_to_class:
+        if ext_type in packers:
+            cls = packers[ext_type]
             try:
-                return ext_type_to_class[ext_type].unpackb(ext_data)
+                return cls.unpackb(ext_data, self.options)
             except AttributeError:
-                raise NotImplementedError(
-                    "Ext class {:s} lacks unpackb()".format(repr(ext_type_to_class[ext_type]))
-                )
+                raise NotImplementedError(f"Ext class {repr(cls)} lacks unpackb()")
 
-    raise UnsupportedTypeException(f"ext_type: 0x{ext_type:0X}")
+        raise UnsupportedTypeException(f"ext_type: 0x{ext_type:0X}")
 
     async def _unpack_array(self, code):
         ic = ord(code)
@@ -134,17 +138,11 @@ class asloader:
         elif ic == 0xDD:
             length = await self._re0(">I", 4)
         else:
-            asloader._fail()
+            ALoader._fail()
         l = []
         for i in range(length):
-            l.append(await self._unpack())
+            l.append(await self.aload())
         return tuple(l) if self.use_tuple else l
-
-    @staticmethod
-    def _deep_list_to_tuple(obj):
-        if isinstance(obj, list):
-            return tuple([asloader._deep_list_to_tuple(e) for e in obj])
-        return obj
 
     async def _unpack_map(self, code):
         ic = ord(code)
@@ -155,35 +153,36 @@ class asloader:
         elif ic == 0xDF:
             length = await self._re0(">I", 4)
         else:
-            asloader._fail()
+            ALoader._fail()
 
         d = {} if not self.use_ordered_dict else collections.OrderedDict()
         for _ in range(length):
             # Unpack key
-            k = await self._unpack()
+            k = await self.aload()
 
             if isinstance(k, list):
                 # Attempt to convert list into a hashable tuple
-                k = asloader._deep_list_to_tuple(k)
+                k = ALoader._deep_list_to_tuple(k)
             try:
                 hash(k)
             except:
-                raise UnhashableKeyException('unhashable key: "{:s}"'.format(str(k)))
+                raise UnhashableKeyException(f'"{str(k)}"')
             if k in d:
-                raise DuplicateKeyException(
-                    'duplicate key: "{:s}" ({:s})'.format(str(k), str(type(k)))
-                )
+                raise DuplicateKeyException(f'"{str(k)}" ({type(k)})')
 
             # Unpack value
-            v = await self._unpack()
+            v = await self.aload()
 
             try:
                 d[k] = v
             except TypeError:
-                raise UnhashableKeyException('unhashable key: "{:s}"'.format(str(k)))
+                raise UnhashableKeyException(f'"{str(k)}"')
         return d
 
-    async def _unpack(self):
+    # API
+    # await aloader_instance.aload()
+    # or async for obj in aloader_instance:
+    async def aload(self):
         code = await self._re(1)
         ic = ord(code)
         if (ic <= 0x7F) or (0xCC <= ic <= 0xD3) or (0xE0 <= ic <= 0xFF):
@@ -211,6 +210,3 @@ class asloader:
         if ic <= 0xDD:
             return await self._unpack_array(code)
         return await self._unpack_map(code)
-
-    async def load(self):
-        return await self._unpack()
