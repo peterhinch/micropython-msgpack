@@ -71,7 +71,8 @@ classes.
 A substantial update has been undertaken to V0.2.0. For users of "advanced"
 features (extension and asynchronous use) this is a breaking change. Objectives
 were to save RAM by removing unnecessary features and simplifying code. PEP5
-compliance has been improved.
+compliance has been improved. To eliminate duplication the `as_load` module has
+been abandoned in favour of `as_loader`.
 
 ### 1.2.1 Extended built-in classes
 
@@ -259,7 +260,7 @@ The following enables support for `byterray`, `set`, `complex` and `tuple` and
 illustrates saving and restoring a `set`.
 ```py
 import umsgpack
-from umsgpack import mpk_bytearray, mpk_set, mpk_complex, mpk_tuple
+import umsgpack.mpk_bytearray, umsgpack.mpk_set, umsgpack.mpk_complex, umsgpack.mpk_tuple
 umsgpack.dumps({1,2,3})
 # Outcome: b'\xd6Q\x93\x03\x01\x02'
 umsgpack.loads(b'\xd6Q\x93\x03\x01\x02')
@@ -268,14 +269,14 @@ umsgpack.loads(b'\xd6Q\x93\x03\x01\x02')
 The following examples may be pasted at the REPL:
 ```python
 import umsgpack
-from umsgpack import mpk_complex
+import umsgpack.mpk_complex
 with open('data', 'wb') as f:
    umsgpack.dump(1 + 4j, f)
 ```
 Reading back:
 ```python
 import umsgpack
-from umsgpack import mpk_complex
+import umsgpack.mpk_complex
 with open('data', 'rb') as f:
     z = umsgpack.load(f)
 print(z)  # prints (1+4j)
@@ -306,7 +307,7 @@ class Point3d:
         return struct.pack(">fff", *self.v)
 
     @staticmethod
-    def unpackb(data):
+    def unpackb(data, options):
         return Point3d(*struct.unpack(">fff", data))
 ```
 The single arg to `ext_serializable` is the extension type: this is an arbitrary
@@ -331,7 +332,6 @@ import umsgpack
 import struct
 from . import Packer
 
-
 @umsgpack.ext_serializable(0x50, complex)
 class Complex(Packer):
     def __init__(self, s, options):
@@ -341,7 +341,7 @@ class Complex(Packer):
         return struct.pack(">ff", self.s.real, self.s.imag)
 
     @staticmethod
-    def unpackb(data):
+    def unpackb(data, options):
         return complex(*struct.unpack(">ff", data))
 ```
 The decorator takes two args, the extension type and the type to be handled.
@@ -356,7 +356,7 @@ must provide the following methods:
  packed data and returns a new instance of the unpacked data type.
 
 Typically this packing and unpacking is done using the `struct` module, but in
-the some simple cases it may be done by `umsgpack` itself. For example
+some simple cases it may be done by `umsgpack` itself. For example
 `mpk_set.py`:
 ```py
 @umsgpack.ext_serializable(0x51, set)
@@ -417,8 +417,33 @@ The demo `asyntest.py` runs on a Pyboard with pins X1 and X2 linked. See code
 comments for connections with other platforms. The code includes notes regarding
 RAM overhead.
 
-The demo `asyntest_py3_serial.py` is similar, but meant to run on a computer with full python3.
+### 7.2.1 The Observer object
 
+This enables the incoming data stream to be monitored. An observer can be any
+callable - typically an instance of a user class with an `__call__` method. This
+is called whenever data is read from the stream: it receives a `bytes` instance
+with the latest data or `b""` when a decode is complete. The following (from
+`asyntest.py`) illustrates an example which displays a buffer full of data for
+each decode.
+```py
+class StreamObserver:
+    def __init__(self, size=100):
+        self.buf = bytearray(size)
+        self.n = 0
+
+    def __call__(self, data: bytes) -> None:
+        if l := len(data):
+            self.buf[self.n : self.n + l] = data
+            self.n += l
+        else:  # End of data
+            print(f"{self.buf[:self.n]}")
+            self.n = 0
+
+async def receiver():
+    uart_aloader = umsgpack.ALoader(asyncio.StreamReader(uart), observer=StreamObserver())
+    async for res in uart_aloader:
+        print("Received:", res)
+```
 # 8. Exceptions
 
 These are defined in `umsgpack/__init__.py`.
@@ -508,7 +533,7 @@ class Complex(Packer):
         return struct.pack(">ff", self.s.real, self.s.imag)
 
     @staticmethod
-    def unpackb(data):
+    def unpackb(data, options):
         return complex(*struct.unpack(">ff", data))
 ```
 The `ext_serializable` decorator takes two args, the `ext_type` integer value
@@ -524,12 +549,12 @@ number followed by a `dict` of options as passed to `dump` or `dumps`. The
 The `packb` method converts the data, returning a `bytes` instance. The `Packer`
 class ensures that the subclass is only instantiated once even in a dump
 containing multiple instances of the supported class. This is achieved via an
-`__call__` method.
+`__call__` method. The `packb` method can access the bound variable `.options`.
+This is a `dict` containing any options passed to `dump` or `dumps`.
 
 The `unpackb` staticmethod accepts a `bytes` instance as created by `packb` and
-returns an instance of the supported class. There is currently no support for
-unpack options.
-
+an `options` dict containing any options passed to `load` or `loads`. It returns
+an instance of the supported class.
 ## Acknowledgements
 
 This project was inspired by

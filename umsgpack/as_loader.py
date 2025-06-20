@@ -34,7 +34,7 @@ class ALoader:
         return self
 
     async def __anext__(self):
-        return await self.aload()
+        return await self.load()
 
     async def _re(self, n):
         d = await self.fp.readexactly(n)
@@ -210,3 +210,9 @@ class ALoader:
         if ic <= 0xDD:
             return await self._unpack_array(code)
         return await self._unpack_map(code)
+
+    async def load(self):
+        rv = await self.aload()
+        if self.observer:
+            self.observer(b"")  # Mark end of data
+        return rv

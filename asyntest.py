@@ -2,11 +2,6 @@
 
 # Copyright (c) 2021-5 Peter Hinch Released under the MIT License see LICENSE
 
-# From testing on a pyboard:
-#   Free RAM after reset 101504 bytes. Free RAM while running 82944 bytes
-#   Usage 18560 bytes i.e. ~18.1KiB
-#   This compares with 5312 bytes for a similar script sending plain text.
-#   The MessagePack overhead is thus 13,248 bytes (12.9KiB).
 
 from sys import platform
 import asyncio
@@ -48,8 +43,17 @@ async def sender():
 
 # Obsever may be a class with __call__ or a simple callback function
 class StreamObserver:
+    def __init__(self, size=100):
+        self.buf = bytearray(size)
+        self.n = 0
+
     def __call__(self, data: bytes) -> None:
-        print(f"{data}")
+        if l := len(data):
+            self.buf[self.n : self.n + l] = data
+            self.n += l
+        else:  # End of data
+            print(f"{self.buf[:self.n]}")
+            self.n = 0
 
 
 # def stream_observer(data: bytes):
@@ -59,7 +63,7 @@ class StreamObserver:
 async def receiver():
     uart_aloader = umsgpack.ALoader(asyncio.StreamReader(uart), observer=StreamObserver())
     async for res in uart_aloader:
-        print("Received (aloader):", res)
+        print("Received:", res)
 
 
 async def main():
