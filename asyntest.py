@@ -56,8 +56,9 @@ class StreamObserver:
             self.n = 0
 
 
-# def stream_observer(data: bytes):
-#   print(f"{data}")
+# Alternative callable observer
+def stream_observer(data: bytes):
+    print(f"{data}")
 
 
 async def receiver():

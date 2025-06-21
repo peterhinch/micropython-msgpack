@@ -27,7 +27,7 @@ class ALoader:
         self.allow_invalid_utf8 = options.get("allow_invalid_utf8")
         self.use_ordered_dict = options.get("use_ordered_dict")
         self.use_tuple = options.get("use_tuple")
-        self.observer = options.get("observer")
+        self.observer = options.get("observer", lambda _: None)
         self.options = options  # For ext types
 
     def __aiter__(self):  # async iterator interface
@@ -38,16 +38,14 @@ class ALoader:
 
     async def _re(self, n):
         d = await self.fp.readexactly(n)
-        if self.observer:
-            self.observer(d)
+        self.observer(d)
         return d
 
     async def _re0(self, s, n):
         d = await self._re(n)
         return struct.unpack(s, d)[0]
 
-    async def _unpack_integer(self, code):
-        ic = ord(code)
+    async def _unpack_integer(self, ic, code):
         if (ic & 0xE0) == 0xE0:
             return struct.unpack("b", code)[0]
         if (ic & 0x80) == 0x00:
@@ -60,16 +58,14 @@ class ALoader:
             ALoader._fail()
         return await self._re0(s.strip(), 1 << (ic & 3))
 
-    async def _unpack_float(self, code):
-        ic = ord(code)
+    async def _unpack_float(self, ic, code):
         if ic == 0xCA:
             return await self._re0(">f", 4)
         if ic == 0xCB:
             return await self._re0(">d", 8)
         ALoader._fail()
 
-    async def _unpack_string(self, code):
-        ic = ord(code)
+    async def _unpack_string(self, ic, code):
         if (ic & 0xE0) == 0xA0:
             length = ic & ~0xE0
         elif ic == 0xD9:
@@ -89,8 +85,7 @@ class ALoader:
                 return data  # MP Remove InvalidString class: subclass of built-in class
             raise InvalidStringException("unpacked string is invalid utf-8")
 
-    async def _unpack_binary(self, code):
-        ic = ord(code)
+    async def _unpack_binary(self, ic, code):
         if ic == 0xC4:
             length = await self._re0("B", 1)
         elif ic == 0xC5:
@@ -102,8 +97,7 @@ class ALoader:
 
         return await self._re(length)
 
-    async def _unpack_ext(self, code):
-        ic = ord(code)
+    async def _unpack_ext(self, ic, code):
         n = b"\xd4\xd5\xd6\xd7\xd8".find(code)
         length = 0 if n < 0 else 1 << n
         if not length:
@@ -129,8 +123,7 @@ class ALoader:
 
         raise UnsupportedTypeException(f"ext_type: 0x{ext_type:0X}")
 
-    async def _unpack_array(self, code):
-        ic = ord(code)
+    async def _unpack_array(self, ic, code):
         if (ic & 0xF0) == 0x90:
             length = ic & ~0xF0
         elif ic == 0xDC:
@@ -144,8 +137,7 @@ class ALoader:
             l.append(await self.aload())
         return tuple(l) if self.use_tuple else l
 
-    async def _unpack_map(self, code):
-        ic = ord(code)
+    async def _unpack_map(self, ic, code):
         if (ic & 0xF0) == 0x80:
             length = ic & ~0xF0
         elif ic == 0xDE:
@@ -171,48 +163,42 @@ class ALoader:
                 raise DuplicateKeyException(f'"{str(k)}" ({type(k)})')
 
             # Unpack value
-            v = await self.aload()
-
-            try:
-                d[k] = v
-            except TypeError:
-                raise UnhashableKeyException(f'"{str(k)}"')
+            d[k] = await self.aload()
         return d
 
-    # API
-    # await aloader_instance.aload()
-    # or async for obj in aloader_instance:
     async def aload(self):
         code = await self._re(1)
         ic = ord(code)
         if (ic <= 0x7F) or (0xCC <= ic <= 0xD3) or (0xE0 <= ic <= 0xFF):
-            return await self._unpack_integer(code)
+            return await self._unpack_integer(ic, code)
         if ic <= 0xC9:
             if ic <= 0xC3:
                 if ic <= 0x8F:
-                    return await self._unpack_map(code)
+                    return await self._unpack_map(ic, code)
                 if ic <= 0x9F:
-                    return await self._unpack_array(code)
+                    return await self._unpack_array(ic, code)
                 if ic <= 0xBF:
-                    return await self._unpack_string(code)
+                    return await self._unpack_string(ic, code)
                 if ic == 0xC1:
                     raise ReservedCodeException("got reserved code: 0xc1")
                 return (None, 0, False, True)[ic - 0xC0]
             if ic <= 0xC6:
-                return await self._unpack_binary(code)
-            return self._unpack_ext(code)
+                return await self._unpack_binary(ic, code)
+            return self._unpack_ext(ic, code)
         if ic <= 0xCB:
-            return await self._unpack_float(code)
+            return await self._unpack_float(ic, code)
         if ic <= 0xD8:
-            return await self._unpack_ext(code)
+            return await self._unpack_ext(ic, code)
         if ic <= 0xDB:
-            return await self._unpack_string(code)
+            return await self._unpack_string(ic, code)
         if ic <= 0xDD:
-            return await self._unpack_array(code)
-        return await self._unpack_map(code)
+            return await self._unpack_array(ic, code)
+        return await self._unpack_map(ic, code)
 
+    # API
+    # await aloader_instance.load()
+    # or async for obj in aloader_instance:
     async def load(self):
         rv = await self.aload()
-        if self.observer:
-            self.observer(b"")  # Mark end of data
+        self.observer(b"")  # Mark end of data
         return rv

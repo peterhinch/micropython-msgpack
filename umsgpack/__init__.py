@@ -26,6 +26,9 @@
 
 __version__ = (0, 2, 0)
 
+# Auto-detect system float precision
+float_precision = "single" if len(str(1 / 3)) < 13 else "double"
+
 # ABC for classes which handle extended Python built-in classes.
 class Packer:
     def __init__(self, s: object, options: dict):

@@ -11,10 +11,6 @@ from collections import OrderedDict
 import io
 from . import *
 
-builtins
-# Auto-detect system float precision
-_float_precision = "single" if len(str(1 / 3)) < 13 else "double"
-
 
 def _fail():  # Debug code should never be called.
     raise Exception("Logic error")
@@ -65,7 +61,7 @@ def _pack_boolean(obj, fp, _):
 
 
 def _pack_float(obj, fp, options):
-    fpr = options.get("force_float_precision", _float_precision)
+    fpr = options.get("force_float_precision", float_precision)
     if fpr == "double":
         fp.write(b"\xcb")
         fp.write(struct.pack(">d", obj))
