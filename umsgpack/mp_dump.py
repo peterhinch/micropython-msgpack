@@ -202,14 +202,15 @@ def mpdump(obj, fp, options):
         # If there is a matching built-in, dict holds Packer class or instance, ext_type byte
         ex, v = builtins[t]  # ex: Packer instance or class, v: ext_type
         if isinstance(ex, type):  # Class: must instantiate
-            pk = ex(obj, options)  # Instantiate Packer
+            pk = ex()  # Instantiate Packer
             builtins[t] = pk, v  # Update dict with instance.
         else:  # Already an instance
-            pk = ex(obj)  # Assign the object to the Packer (__call__)
+            pk = ex  # Assign the object to the Packer (__call__)
         try:
-            _pack_ext(v, pk.packb(), fp)  # Run the Packer and prepend MessagePack header.
+            # Run the Packer and prepend MessagePack header
+            _pack_ext(v, pk.packb(obj, options), fp)
         except AttributeError:
-            raise NotImplementedError("Class {:s} lacks packb()".format(repr(obj.__class__)))
+            raise NotImplementedError(f"Class {repr(obj.__class__)} invalid packb()")
         return
     except StopIteration:
         pass

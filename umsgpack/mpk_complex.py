@@ -7,18 +7,15 @@
 
 import umsgpack
 import struct
-from . import Packer, float_precision
+from . import float_precision
 
 
 @umsgpack.ext_serializable(0x50, complex)
-class Complex(Packer):
-    def __init__(self, s, options):
-        super().__init__(s, options)
-        self.dp = options.get("force_float_precision", float_precision) == "double"
-        self.fs = ">bdd" if self.dp else ">bff"
-
-    def packb(self):
-        return struct.pack(self.fs, self.dp, self.s.real, self.s.imag)
+class Complex:
+    def packb(self, obj, options):
+        dp = options.get("force_float_precision", float_precision) == "double"
+        fs = ">bdd" if dp else ">bff"
+        return struct.pack(fs, dp, obj.real, obj.imag)
 
     @staticmethod
     def unpackb(data, options):

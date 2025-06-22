@@ -4,16 +4,13 @@
 
 import umsgpack
 import struct
-from . import Packer
 
 
 @umsgpack.ext_serializable(0x53, bytearray)
-class ByteArray(Packer):
-    def __init__(self, s, options):
-        super().__init__(s, options)
-
-    def packb(self):
-        return umsgpack.dumps(bytes(self.s))
+class ByteArray:
+    def packb(self, s, options):
+        # Convert to bytes to avoid infinite recursion
+        return umsgpack.dumps(bytes(s))
 
     @staticmethod
     def unpackb(data, options):

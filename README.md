@@ -216,7 +216,8 @@ The API supports the following methods:
  5. `ALoader(fp, **options)` Asynchronous unpack of data from a `StreamReader`.
  See [section 7](./README.md#7-asynchronous-use).
 
-The options are discussed below. Most are rather specialised.
+The options are discussed below. Most are rather specialised - the principal use
+case being exchanging data with non-Python targets.
 
 ## 4.1 Load options
 
@@ -237,7 +238,7 @@ may become pointless.
 
 ## 4.2 Dump options
 
-`dump` and `dumps` support the following option as keyword args:  
+`dump` and `dumps` support the following option as a keyword arg:  
 
  1. `force_float_precision` (str): `"single"` to force packing floats as
  IEEE-754 single-precision floats, `"double"` to force packing floats as
@@ -279,7 +280,8 @@ import umsgpack
 import umsgpack.mpk_complex
 with open('data', 'rb') as f:
     z = umsgpack.load(f)
-print(z)  # prints (1+4j)
+print(z)
+# Outcome (1+4j)
 ```
 # 6 Extending umsgpack
 
@@ -326,18 +328,15 @@ print(umsgpack.loads(s))  # Outcome Point3d( 1.00  2.10  3.00)
 
 ## 6.2 Adding built-in types
 
-The following is the contents of `mpk_complex.py`:
+The following is a simplified version of the contents of `mpk_complex.py` (the
+actual module includes code to define the float precision):
 ```python
 import umsgpack
 import struct
-from . import Packer
 
-@umsgpack.ext_serializable(0x50, complex)
-class Complex(Packer):
-    def __init__(self, s, options):
-        super().__init__(s, options)
-
-    def packb(self):
+@umsgpack.ext_serializable(0x49, complex)
+class Complex:
+    def packb(self, s, options):  # s is a complex instance
         return struct.pack(">ff", self.s.real, self.s.imag)
 
     @staticmethod
@@ -345,30 +344,29 @@ class Complex(Packer):
         return complex(*struct.unpack(">ff", data))
 ```
 The decorator takes two args, the extension type and the type to be handled.
-A class defined with the two-arg decorator must be subclassed from `Packer` and
-must provide the following methods:
+A class defined with the two-arg decorator must provide the following methods:
 
- * Constructor: Takes two args, an instance of the type to be serialised and a
- `dict` of pack options. The latter is stored in a bound variable `.options`.
- * `packb` This returns a `bytes` instance containing the serialised object. The
- method can optionally access `.options`.
+ * `packb` Takes two args, an instance of the type to be serialised and a
+ `dict` of pack options. Returns a `bytes` instance containing the serialised
+ object. The  method can optionally access `.options`.
  * `unpackb` Defined as a static method, this accepts a `bytes` instance of
- packed data and returns a new instance of the unpacked data type.
+ packed data and a  `dict` of unpack options. Returns a new instance of the
+ unpacked data type.
+
+The options comprise any keyword args supplied to `dump(s)` and `load(s)`
+respectively.
 
 Typically this packing and unpacking is done using the `struct` module, but in
 some simple cases it may be done by `umsgpack` itself. For example
 `mpk_set.py`:
 ```py
 @umsgpack.ext_serializable(0x51, set)
-class Set(Packer):
-    def __init__(self, s, options):
-        super().__init__(s, options)
-
-    def packb(self):  # Pack as a list
+class Set:
+    def packb(self, s, options):  # Pack as a list
         return umsgpack.dumps(list(self.s))
 
     @staticmethod
-    def unpackb(data):
+    def unpackb(data, options):
         return set(umsgpack.loads(data))  # Cast to set
 ```
 Contributions of new built-in serialisers are welcome.
@@ -520,41 +518,59 @@ support for further types. Consider this code which adds support for complex
 numbers:
 ```py
 import umsgpack
-import struct
-from . import Packer
-
-
+import umsgpack.mpk_complex
+```
+The `mpk_complex` module contains this code
+```py
 @umsgpack.ext_serializable(0x50, complex)
-class Complex(Packer):
-    def __init__(self, s, options):
-        super().__init__(s, options)
-
-    def packb(self):
-        return struct.pack(">ff", self.s.real, self.s.imag)
-
+class Complex:
+    def packb(self, obj, options):
+      # Code omitted
     @staticmethod
     def unpackb(data, options):
-        return complex(*struct.unpack(">ff", data))
+      # code omitted
 ```
-The `ext_serializable` decorator takes two args, the `ext_type` integer value
-which represents the record type, and the class to be encoded. The `ext_type`
-value should be a byte unique to this class.
+Classes decorated with `ext_serializable` are known as "packers" and must have
+a `paackb` method and an `unpackb` static method.
 
-The class `Complex` must be subclassed from `Packer`. The name `Complex` is
-arbitrary. When the class is instantiated it receives an instance of a `complex`
-number followed by a `dict` of options as passed to `dump` or `dumps`. The
-`Packer` stores this `dict` in a `.options` bound variable, enabling access by
-`.packb`. In the case of `Complex` the options are ignored.
+For builtins the `ext_serializable` decorator takes two args, the `ext_type`
+integer value which represents the record type, and the class to be encoded. The
+`ext_type` value should be a byte unique to this class. The decorator
+(in `__init__.py`) runs when the module is imported. Because there are two args
+it populates a global `builtins` dictionary. The key is the target class
+(`complex`) and the value is a 2-tuple `(0x50, Complex)` i.e. the unique
+`ext_type` byte and the packer class.
 
-The `packb` method converts the data, returning a `bytes` instance. The `Packer`
-class ensures that the subclass is only instantiated once even in a dump
-containing multiple instances of the supported class. This is achieved via an
-`__call__` method. The `packb` method can access the bound variable `.options`.
-This is a `dict` containing any options passed to `dump` or `dumps`.
+In the case of user classes the decorator receives only one arg being the
+`ext_type` value. A global dictionary `custom` is populated: the key is the
+user class and the value is the `ext_type`. (No instance of the user class is
+created).
+
+On packing the `builtins` and `custom` dictionaries are used to locate the
+appropriate packer with its `packb` method. To avoid needless instantiation of
+packers, the value of the `buitins` dict is updated to replace the packer class
+with a packer instance.
+
+In both cases a global `packers` dictionary is populated: the key is the
+`ext_type` and the value is the packer class or user class. This is used on
+unpacking to locate the `unpackb` method.
+
+This mechanism implies that the names of a packer class and the module
+containing it are arbitrary.
+
+A packer's `packb` method converts the data, returning a `bytes` instance. It
+receives the object to be packed and a dict of `.options`, being the keyword
+args passed to `dump(s)`.
 
 The `unpackb` staticmethod accepts a `bytes` instance as created by `packb` and
-an `options` dict containing any options passed to `load` or `loads`. It returns
-an instance of the supported class.
+an `options` dict containing any options passed to `load(s)`. It returns an
+instance of the supported class.
+
+Typically `packb` and `unpackb` use the `struct` module, but in simple cases
+they can convert between the supported data type and one natively supported,
+and use `umsgpack` itself. See `mpk_set.py` which converts a `set` to a `list`
+and /vice versa/.
+
 ## Acknowledgements
 
 This project was inspired by

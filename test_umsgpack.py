@@ -297,7 +297,6 @@ tuple_test_vectors = [
 #     "dumps",
 #     "load",
 #     "loads",
-#     "Packer",
 #     "custom",
 #     "ext_type_to_class",
 #     "types",
@@ -506,15 +505,9 @@ class TestUmsgpack(unittest.TestCase):
 
         # Test extension classes for builtins
         @umsgpack.ext_serializable(0x51, set)
-        class Set(umsgpack.Packer):
-            def __init__(self, s, options):
-                super().__init__(s, options)
-
-            def __str__(self):
-                return f"Set({self.s})"
-
-            def packb(self):  # Must change to list otherwise get infinite recursion
-                return umsgpack.dumps(list(self.s))
+        class Set:
+            def packb(self, s, _):  # Must change to list otherwise get infinite recursion
+                return umsgpack.dumps(list(s))
 
             @staticmethod
             def unpackb(data, options):

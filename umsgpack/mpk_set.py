@@ -4,16 +4,12 @@
 
 import umsgpack
 import struct
-from . import Packer
 
 
 @umsgpack.ext_serializable(0x51, set)
-class Set(Packer):
-    def __init__(self, s, options):
-        super().__init__(s, options)
-
-    def packb(self):  # Must change to list otherwise get infinite recursion
-        return umsgpack.dumps(list(self.s))
+class Set:
+    def packb(self, s, options):  # Must change to list otherwise get infinite recursion
+        return umsgpack.dumps(list(s))
 
     @staticmethod
     def unpackb(data, options):

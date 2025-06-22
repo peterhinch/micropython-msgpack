@@ -4,16 +4,12 @@
 
 import umsgpack
 import struct
-from . import Packer
 
 
 @umsgpack.ext_serializable(0x52, tuple)
-class Tuple(Packer):
-    def __init__(self, s, options):
-        super().__init__(s, options)
-
-    def packb(self):
-        return umsgpack.dumps(list(self.s))  # Infinite recursion
+class Tuple:
+    def packb(self, s, options):
+        return umsgpack.dumps(list(s))  # Infinite recursion
 
     @staticmethod
     def unpackb(data, options):
