@@ -19,7 +19,7 @@ def _fail():  # Debug code should never be called.
 # struct.pack returns a bytes object
 
 
-def _pack_integer(obj, fp, _):
+def _pack_integer(obj, fp):
     if obj < 0:
         if obj >= -32:
             fp.write(struct.pack("b", obj))
@@ -56,7 +56,7 @@ def _pack_integer(obj, fp, _):
             raise UnsupportedTypeException("huge unsigned int")
 
 
-def _pack_boolean(obj, fp, _):
+def _pack_boolean(obj, fp):
     fp.write(b"\xc3" if obj else b"\xc2")
 
 
@@ -72,7 +72,7 @@ def _pack_float(obj, fp, options):
         raise ValueError("invalid float precision")
 
 
-def _pack_string(obj, fp, _):
+def _pack_string(obj, fp):
     obj = bytes(obj, "utf-8")  # Preferred MP encode method
     obj_len = len(obj)
     if obj_len < 32:
@@ -91,7 +91,7 @@ def _pack_string(obj, fp, _):
     fp.write(obj)
 
 
-def _pack_binary(obj, fp, _):
+def _pack_binary(obj, fp):
     obj_len = len(obj)
     if obj_len < 2 ** 8:
         fp.write(b"\xc4")
@@ -176,19 +176,6 @@ def _utype(obj):
 
 # ***** Interface to __init__.py *****
 
-# Despatch table
-_dtable = {
-    bool: _pack_boolean,
-    int: _pack_integer,
-    float: _pack_float,
-    str: _pack_string,
-    bytes: _pack_binary,
-    bytearray: _pack_binary,
-    list: _pack_array,
-    tuple: _pack_array,
-    dict: _pack_map,
-    OrderedDict: _pack_map,  # Should not be necessary: OrderedDict is a dict
-}
 # Pack with unicode 'str' type, 'bytes' type
 # options is a dict (from dump())
 def mpdump(obj, fp, options):
@@ -209,10 +196,28 @@ def mpdump(obj, fp, options):
         return
     except StopIteration:
         pass
-    # Is obj a native built-in type?
-    func = _dtable.get(obj.__class__, None)
-    if func is not None:
-        func(obj, fp, options)
+    # Is obj a built-in type?
+    # NOTE: using a depatch table consumed 1800 bytes more than code below.
+    if isinstance(obj, bool):
+        _pack_boolean(obj, fp)
+        return
+    if isinstance(obj, int):
+        _pack_integer(obj, fp)
+        return
+    if isinstance(obj, float):
+        _pack_float(obj, fp, options)
+        return
+    if isinstance(obj, str):
+        _pack_string(obj, fp)
+        return
+    if isinstance(obj, (bytes, bytearray)):
+        _pack_binary(obj, fp)
+        return
+    if isinstance(obj, (list, tuple)):
+        _pack_array(obj, fp, options)
+        return
+    if isinstance(obj, (dict, OrderedDict)):
+        _pack_map(obj, fp, options)
         return
 
     if not custom:  # Custom class is last chance saloon.
