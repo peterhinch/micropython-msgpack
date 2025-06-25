@@ -245,6 +245,11 @@ may become pointless.
  IEEE-754 double-precision floats. By default the precision of the target's
  firmware is detected and used.
 
+At risk of stating the obvious, on a 32-bit platform there is little point in
+packing to 64-bit precision as the platform's underlying precision is only 32
+bits. However packing as single on a 64-bit platform saves a lot of space. The
+supplied `mpk_complex.py` honours the `force_float_precision` arg.
+
 # 5. Extension modules: additional built-in types
 
 These extend MessagePack to handle further built-in data types. Each module
@@ -336,8 +341,9 @@ import struct
 
 @umsgpack.ext_serializable(0x49, complex)
 class Complex:
-    def packb(self, s, options):  # s is a complex instance
-        return struct.pack(">ff", self.s.real, self.s.imag)
+    @staticmethod
+    def packb(s, options):  # s is a complex instance
+        return struct.pack(">ff", s.real, s.imag)
 
     @staticmethod
     def unpackb(data, options):
@@ -362,8 +368,9 @@ some simple cases it may be done by `umsgpack` itself. For example
 ```py
 @umsgpack.ext_serializable(0x51, set)
 class Set:
-    def packb(self, s, options):  # Pack as a list
-        return umsgpack.dumps(list(self.s))
+    @staticmethod
+    def packb(s, options):  # Pack as a list
+        return umsgpack.dumps(list(s))
 
     @staticmethod
     def unpackb(data, options):
@@ -524,14 +531,15 @@ The `mpk_complex` module contains this code
 ```py
 @umsgpack.ext_serializable(0x50, complex)
 class Complex:
-    def packb(self, obj, options):
+    @staticmethod
+    def packb(obj, options):
       # Code omitted
     @staticmethod
     def unpackb(data, options):
       # code omitted
 ```
 Classes decorated with `ext_serializable` are known as "packers" and must have
-a `paackb` method and an `unpackb` static method.
+static methods `packb` and `unpackb`.
 
 For builtins the `ext_serializable` decorator takes two args, the `ext_type`
 integer value which represents the record type, and the class to be encoded. The
@@ -544,32 +552,30 @@ it populates a global `builtins` dictionary. The key is the target class
 In the case of user classes the decorator receives only one arg being the
 `ext_type` value. A global dictionary `custom` is populated: the key is the
 user class and the value is the `ext_type`. (No instance of the user class is
-created).
+created). The user class must have a `packb` method and an `unpackb` static
+method.
 
 On packing the `builtins` and `custom` dictionaries are used to locate the
-appropriate packer with its `packb` method. To avoid needless instantiation of
-packers, the value of the `buitins` dict is updated to replace the packer class
-with a packer instance.
+appropriate packer with its `packb` method. Packers are never instantiated.
 
-In both cases a global `packers` dictionary is populated: the key is the
-`ext_type` and the value is the packer class or user class. This is used on
-unpacking to locate the `unpackb` method.
+In both type of extensions the decorator populates a global `packers` dictionary: the key is the `ext_type` and the value is the packer class or user class. This
+class is used on unpacking to run the `unpackb` static method.
 
 This mechanism implies that the names of a packer class and the module
 containing it are arbitrary.
 
-A packer's `packb` method converts the data, returning a `bytes` instance. It
-receives the object to be packed and a dict of `.options`, being the keyword
-args passed to `dump(s)`.
+The `packb` method of a packer or use class converts the data, returning a
+`bytes` instance. It receives the object to be packed and a dict of `.options`,
+being the keyword args passed to `dump(s)`.
 
-The `unpackb` staticmethod accepts a `bytes` instance as created by `packb` and
+The `unpackb` static method accepts a `bytes` instance as created by `packb` and
 an `options` dict containing any options passed to `load(s)`. It returns an
 instance of the supported class.
 
 Typically `packb` and `unpackb` use the `struct` module, but in simple cases
 they can convert between the supported data type and one natively supported,
 and use `umsgpack` itself. See `mpk_set.py` which converts a `set` to a `list`
-and /vice versa/.
+and _vice versa_.
 
 ## Acknowledgements
 

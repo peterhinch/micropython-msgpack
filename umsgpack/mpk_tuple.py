@@ -8,7 +8,8 @@ import struct
 
 @umsgpack.ext_serializable(0x52, tuple)
 class Tuple:
-    def packb(self, s, options):
+    @staticmethod
+    def packb(s, options):
         return umsgpack.dumps(list(s))  # Infinite recursion
 
     @staticmethod

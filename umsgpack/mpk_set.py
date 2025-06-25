@@ -8,7 +8,8 @@ import struct
 
 @umsgpack.ext_serializable(0x51, set)
 class Set:
-    def packb(self, s, options):  # Must change to list otherwise get infinite recursion
+    @staticmethod
+    def packb(s, options):  # Must change to list otherwise get infinite recursion
         return umsgpack.dumps(list(s))
 
     @staticmethod

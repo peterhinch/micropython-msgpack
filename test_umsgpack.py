@@ -506,7 +506,8 @@ class TestUmsgpack(unittest.TestCase):
         # Test extension classes for builtins
         @umsgpack.ext_serializable(0x51, set)
         class Set:
-            def packb(self, s, _):  # Must change to list otherwise get infinite recursion
+            @staticmethod
+            def packb(s, _):  # Must change to list otherwise get infinite recursion
                 return umsgpack.dumps(list(s))
 
             @staticmethod

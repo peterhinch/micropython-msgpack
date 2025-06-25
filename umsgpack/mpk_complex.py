@@ -12,7 +12,8 @@ from . import float_precision
 
 @umsgpack.ext_serializable(0x50, complex)
 class Complex:
-    def packb(self, obj, options):
+    @staticmethod
+    def packb(obj, options):
         dp = options.get("force_float_precision", float_precision) == "double"
         fs = ">bdd" if dp else ">bff"
         return struct.pack(fs, dp, obj.real, obj.imag)

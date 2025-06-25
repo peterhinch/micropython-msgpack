@@ -199,13 +199,8 @@ def mpdump(obj, fp, options):
     # native (tuple)
     try:
         t = next((t for t in builtins if isinstance(obj, t)))  # Retrieve matching type
-        # If there is a matching built-in, dict holds Packer class or instance, ext_type byte
-        ex, v = builtins[t]  # ex: Packer instance or class, v: ext_type
-        if isinstance(ex, type):  # Class: must instantiate
-            pk = ex()  # Instantiate Packer
-            builtins[t] = pk, v  # Update dict with instance.
-        else:  # Already an instance
-            pk = ex  # Assign the object to the Packer (__call__)
+        # If there is a matching built-in, dict holds Packer class, ext_type byte
+        pk, v = builtins[t]  # pk: Packer class, v: ext_type
         try:
             # Run the Packer and prepend MessagePack header
             _pack_ext(v, pk.packb(obj, options), fp)

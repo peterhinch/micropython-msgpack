@@ -8,7 +8,8 @@ import struct
 
 @umsgpack.ext_serializable(0x53, bytearray)
 class ByteArray:
-    def packb(self, s, options):
+    @staticmethod
+    def packb(s, options):
         # Convert to bytes to avoid infinite recursion
         return umsgpack.dumps(bytes(s))
 
