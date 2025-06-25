@@ -198,24 +198,26 @@ def mpdump(obj, fp, options):
         pass
     # Is obj a built-in type?
     # NOTE: using a depatch table consumed 1800 bytes more than code below.
-    ok = True
     if isinstance(obj, bool):
         _pack_boolean(obj, fp)
-    elif isinstance(obj, int):
+        return
+    if isinstance(obj, int):
         _pack_integer(obj, fp)
-    elif isinstance(obj, float):
+        return
+    if isinstance(obj, float):
         _pack_float(obj, fp, options)
-    elif isinstance(obj, str):
+        return
+    if isinstance(obj, str):
         _pack_string(obj, fp)
-    elif isinstance(obj, (bytes, bytearray)):
+        return
+    if isinstance(obj, (bytes, bytearray)):
         _pack_binary(obj, fp)
-    elif isinstance(obj, (list, tuple)):
+        return
+    if isinstance(obj, (list, tuple)):
         _pack_array(obj, fp, options)
-    elif isinstance(obj, (dict, OrderedDict)):
+        return
+    if isinstance(obj, (dict, OrderedDict)):
         _pack_map(obj, fp, options)
-    else:
-        ok = False
-    if ok:
         return
 
     if not custom:  # Custom class is last chance saloon.
