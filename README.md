@@ -1,6 +1,10 @@
+# MicroPython MessagePack
+
+An efficient drop-in binary alternative to JSON. 
+
 # 0. Contents
 
-1. [Introduction](./README.md#1-micropython-messagepack-introduction)  
+1. [Introduction](./README.md#1-introduction)  
  1.1 [Supported Types](./README.md#11-supported-types) List of supported data types.  
  1.2 [Library update](./README.md#12-library-update) Changes in release 0.2.0.  
  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.1 [Extended built-in classes](./README.md#121-extended-built-in-classes)  
@@ -15,7 +19,7 @@
 4. [API](./README.md#4-api) User interface.  
  4.1 [Load options](./README.md#41-load-options) Specialist options.  
  4.2 [Dump options](./README.md#42-dump-options)  
-5. [Extension modules](./README.md#5-extension-modules:-additional-built-in-types) Using extension modules.  
+5. [Extension modules](./README.md#5-extension-modules) Using extension modules to process additional built-in types.  
 6. [Extending umsgpack](./README.md#6-extending-umsgpack) Writing extensions.  
  6.1 [Serialisable user classes](./README.md#61-serialisable-user-classes)  
  6.2 [Adding built-in types](./README.md#62-adding-built-in-types)  
@@ -32,7 +36,7 @@
 14. [References](./README.md#14-References)  
 15. [Licence](./README.md#15-licence)
 
-# 1. MicroPython MessagePack Introduction
+# 1. Introduction
 
 [MessagePack](http://msgpack.org/) is a serialization protocol similar to JSON.
 Where JSON produces human readable strings, MessagePack produces binary `bytes`
@@ -289,7 +293,7 @@ supplied `mpk_complex.py` honours the `force_float_precision` arg.
 
 #### [Contents](./README.md#0-contents)  
 
-# 5. Extension modules: additional built-in types
+# 5. Extension modules
 
 These extend MessagePack to handle further built-in data types. Each module
 supports one data type; importing a module enables that support. Currently the
@@ -556,7 +560,8 @@ These can be summarised as follows:
 Python2 code removed.  
 Compatibility mode removed.  
 Timestamps removed.  
-Converted to Python package with lazy import to save RAM.  
+Converted to Python package with lazy import to save RAM.
+Replace function despatch table with code.   
 Provide asyncio StreamReader support.
 Exported functions now match ujson: dump, dumps, load, loads (only).  
 Many functions refactored to save bytes.  
