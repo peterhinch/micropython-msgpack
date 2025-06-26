@@ -171,7 +171,7 @@ def _pack_map(obj, fp, options):
 
 
 def _utype(obj):
-    raise UnsupportedTypeException(f"{type(obj)}")
+    raise UnsupportedTypeException("{}".format(str(type(obj))))
 
 
 # ***** Interface to __init__.py *****
@@ -192,7 +192,7 @@ def mpdump(obj, fp, options):
             # Run the Packer and prepend MessagePack header
             _pack_ext(v, pk.packb(obj, options), fp)
         except AttributeError:
-            raise NotImplementedError(f"Class {repr(obj.__class__)} invalid packb()")
+            raise NotImplementedError("Class {} invalid packb()".format(repr(obj.__class__)))
         return
     except StopIteration:
         pass

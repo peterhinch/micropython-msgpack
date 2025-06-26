@@ -48,8 +48,8 @@ The following types are natively supported.
  * `bytes` Binary data.
  * `float` IEEE-754 single or double precision controlled by a dump option.
  * `tuple` By default tuples are de-serialised as lists, but this can be
- overridden by a load option. The extension module provides proper support
- wherby `list` and `tuple` objects unpack unchanged.
+ overridden by a load option. An extension module provides proper support
+ whereby `list` and `tuple` objects unpack unchanged.
  * `list` Termed "array" in MessagePack documentation.
  * `dict` Termed "map" in MessagePack docs.
 
@@ -86,8 +86,8 @@ when packing extended built-ins.
 
 ### 1.2.2 Asynchronous unpacking
 
-This now has an option for an asynchronous iterator. The `observer` object can
-now be any callable (a callback or a class).
+Unpacking is now via an asynchronous iterator. The `observer` object can now be
+any callable (a callback function/method or a class).
 
 ## 1.3 Compression performance
 
@@ -116,14 +116,12 @@ This implementation is based on the following well proven MessagePack repo
 under Python 2 and Python 3. With trivial adaptations it will run under
 [MicroPython](https://micropython.org/) but at a high cost in RAM consumption.
 This version was adapted from that codebase and optimised to minimise RAM usage
-when run on microcontrollers. Consumption is about 12KiB measured on STM32.
-Using frozen bytecode this reduces to about 3.5KiB. This was tested with the
-`asyntest.py` demo, comparing the free RAM with that available running a
-similar script which exchanges uncompressed data. The difference was taken to
-be the library overhead of running compression and asynchronous decompression.
+when run on microcontrollers. When using frozen bytecode or romfs RAM use can be
+as low as 2192 bytes for `dumps` and 1008 bytes for `loads` - see
+[section 12](./README.md#12-measurement-of-ram-usage).
 
 This version is a subset of the original. Support was removed for features
-thought unnecessary for microcontroller use. The principal example is that of
+thought problematic for microcontroller use. The principal example is that of
 timestamps. MicroPython does not support the `datetime` module. There are also
 issues with platforms differing in their time handling, notably the epoch. On a
 microcontroller it is simple to send the integer result from `time.time()` or
@@ -134,7 +132,6 @@ Supported types are fully compliant with a subset of the latest
 [MessagePack specification](https://github.com/msgpack/msgpack/blob/master/spec.md).
 In particular, it supports the new binary, UTF-8 string and application-defined
 ext types. As stated above, timestamps are unsupported.
-
 
 This MicroPython version uses various techniques to minimise RAM use including
 "lazy imports": a module is only imported on first usage. For example an
@@ -152,7 +149,7 @@ foreign language party.
 The MessagePack specification does not distinguish between mutable and
 immutable types. Consequently the non-extended module will be unable to
 distinguish `tuple` and `list` items, also `bytes` and `bytearray`. The
-extension module addresses this.
+extension modules address this.
 
 # 3. Installation
 
@@ -175,7 +172,7 @@ The following files are installed by `mpremote`:
 7. `umsgpack/mpk_set.py` Extends support to `set`.  
 8. `umsgpack/mpk_tuple.py` Extends support to `tuple`.  
 9. `asyntest.py` Demo of asynchronous use of MessagePack.  
-10. `user_class.py` Demo of a user defined class that is serialisable by messagePack.  
+10. `user_class.py` Demo of a user defined class that is serialisable by MessagePack.  
 
 In a minimal installation only items 1-3 are required.
 
@@ -350,21 +347,20 @@ class Complex:
         return complex(*struct.unpack(">ff", data))
 ```
 The decorator takes two args, the extension type and the type to be handled.
-A class defined with the two-arg decorator must provide the following methods:
+A class defined with the two-arg decorator must provide the following static
+methods:
 
  * `packb` Takes two args, an instance of the type to be serialised and a
  `dict` of pack options. Returns a `bytes` instance containing the serialised
- object. The  method can optionally access `.options`.
- * `unpackb` Defined as a static method, this accepts a `bytes` instance of
- packed data and a  `dict` of unpack options. Returns a new instance of the
- unpacked data type.
+ object. The method can optionally access `.options`.
+ * `unpackb` This accepts a `bytes` instance of packed data and a `dict` of
+ unpack options. Returns a new instance of the unpacked data type.
 
-The options comprise any keyword args supplied to `dump(s)` and `load(s)`
+The options comprise the keyword args supplied to `dump(s)` and `load(s)`
 respectively.
 
-Typically this packing and unpacking is done using the `struct` module, but in
-some simple cases it may be done by `umsgpack` itself. For example
-`mpk_set.py`:
+Typically packing and unpacking is done using the `struct` module, but in some
+simple cases it may be done by `umsgpack` itself. For example `mpk_set.py`:
 ```py
 @umsgpack.ext_serializable(0x51, set)
 class Set:
@@ -558,8 +554,9 @@ method.
 On packing the `builtins` and `custom` dictionaries are used to locate the
 appropriate packer with its `packb` method. Packers are never instantiated.
 
-In both type of extensions the decorator populates a global `packers` dictionary: the key is the `ext_type` and the value is the packer class or user class. This
-class is used on unpacking to run the `unpackb` static method.
+In both type of extensions the decorator populates a global `packers`
+dictionary: the key is the `ext_type` and the value is the packer class or user
+class. This class is used on unpacking to run the `unpackb` static method.
 
 This mechanism implies that the names of a packer class and the module
 containing it are arbitrary.
@@ -576,6 +573,33 @@ Typically `packb` and `unpackb` use the `struct` module, but in simple cases
 they can convert between the supported data type and one natively supported,
 and use `umsgpack` itself. See `mpk_set.py` which converts a `set` to a `list`
 and _vice versa_.
+
+# 12. Measurement of RAM usage
+
+This test used an RP2040 with precompiled code in romfs. In each case the code
+below was placed in `main.py`, the board re-booted, and the result observed.
+
+Pack:
+```py
+import gc, umsgpack
+gc.collect()
+a = gc.mem_free()
+umsgpack.dumps(1)
+gc.collect()
+b = gc.mem_free()
+print(a-b)
+```
+Unpack:
+```py
+import gc, umsgpack
+gc.collect()
+a = gc.mem_free()
+umsgpack.loads(b'\x01')
+gc.collect()
+b = gc.mem_free()
+print(a-b)
+```
+Results were pack: 2192 bytes, unpack 1008 bytes.
 
 ## Acknowledgements
 
