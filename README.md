@@ -1,3 +1,37 @@
+# 0. Contents
+
+1. [Introduction](./README.md#1-micropython-messagepack-introduction)  
+ 1.1 [Supported Types](./README.md#11-supported-types) List of supported data types.  
+ 1.2 [Library update](./README.md#12-library-update) Changes in release 0.2.0.  
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.1 [Extended built-in classes](./README.md#121-extended-built-in-classes)  
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.2 [Asynchronous unpacking](./README.md#122-asynchronous-unpacking) Use with streaming data.  
+ 1.3 [Comprssion performance](./README.md#13-compression-performance)  
+2. [The MicroPython implementation](./README.md#2-the-micropython-implementation)  
+ 2.1 [Inter-operation](./README.md#21-inter-operation) Standard compliance: data exchange with other systems.  
+3. [Installation](./README.md#3-installation)  
+ 3.1 [Quick install](./README.md#31-quick-install)  
+ 3.2 [Files](./README.md#32-files) List of installed files.  
+ 3.3 [Manual install](./README.md#33-manual-install) Doing it the hard way.  
+4. [API](./README.md#4-api) User interface.  
+ 4.1 [Load options](./README.md#41-load-options) Specialist options.  
+ 4.2 [Dump options](./README.md#42-dump-options)  
+5. [Extension modules](./README.md#5-extension-modules:-additional-built-in-types) Using extension modules.  
+6. [Extending umsgpack](./README.md#6-extending-umsgpack) Writing extensions.  
+ 6.1 [Serialisable user classes](./README.md#61-serialisable-user-classes)  
+ 6.2 [Adding built-in types](./README.md#62-adding-built-in-types)  
+7. [Asynchronous use](./README.md#7-asynchronous-use) Use with streaming I/O.  
+ 7.1 [Serialisation](./README.md#71-serialisation)  
+ 7.2 [De-serialisation](./README.md#72-de-serialisation)  
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;7.2.1 [The Observer object](./README.md#721-the-observer-object) Optionally observe the data stream.  
+8. [Exceptions](./README.md#8-exceptions)  
+9. [Test suite](./README.md#9-test-suite)  
+10. [Changes for MicroPython](./README.md#10-changes-for-micropython) Brief summary of changes for microcontroller use.  
+11. [Notes on extension classes](./README.md#11-notes-on-extension-classes) Detailed "how it works" notes.  
+12. [Measurement of RAM usage](./README.md#12-measurement-of-ram-usage)  
+13. [Acknowledgements](./README.md#13-acknowledgements)  
+14. [References](./README.md#14-References)  
+15. [Licence](./README.md#15-licence)
+
 # 1. MicroPython MessagePack Introduction
 
 [MessagePack](http://msgpack.org/) is a serialization protocol similar to JSON.
@@ -109,6 +143,8 @@ If large quantities of text are to be transmitted, a greater gain could be
 achieved by compressing the text with a `gzip` style compressor and serialising
 the resultant `bytes` object with MessagePack.
 
+#### [Contents](./README.md#0-contents)  
+
 # 2. The MicroPython implementation
 
 This implementation is based on the following well proven MessagePack repo
@@ -151,6 +187,8 @@ immutable types. Consequently the non-extended module will be unable to
 distinguish `tuple` and `list` items, also `bytes` and `bytearray`. The
 extension modules address this.
 
+#### [Contents](./README.md#0-contents)  
+
 # 3. Installation
 
 ## 3.1 Quick install
@@ -180,7 +218,7 @@ Additional files:
 1. `asyntest_py3_serial` Demo of running the library on a PC.
 2. `test_umsgpack.py` The full test suite.
 
-See [section 10](./README.md#10-test-suite) for details of the test suite.
+See [section 9](./README.md#9-test-suite) for details of the test suite.
 
 ## 3.3 Manual install
 
@@ -196,6 +234,8 @@ The following optional files may also be copied to the target:
 
 The file `test_umsgpack.py` is the test suite which runs on a PC. See
 [section 9](./README.md#9-test-suite).
+
+#### [Contents](./README.md#0-contents)  
 
 # 4. API
 
@@ -247,6 +287,8 @@ packing to 64-bit precision as the platform's underlying precision is only 32
 bits. However packing as single on a 64-bit platform saves a lot of space. The
 supplied `mpk_complex.py` honours the `force_float_precision` arg.
 
+#### [Contents](./README.md#0-contents)  
+
 # 5. Extension modules: additional built-in types
 
 These extend MessagePack to handle further built-in data types. Each module
@@ -285,6 +327,8 @@ with open('data', 'rb') as f:
 print(z)
 # Outcome (1+4j)
 ```
+#### [Contents](./README.md#0-contents)  
+
 # 6 Extending umsgpack
 
 This is done via the `ext_serializable` decorator which is used in two ways: to
@@ -374,6 +418,8 @@ class Set:
 ```
 Contributions of new built-in serialisers are welcome.
 
+#### [Contents](./README.md#0-contents)  
+
 # 7. Asynchronous use
 
 ## 7.1 Serialisation
@@ -445,6 +491,8 @@ async def receiver():
     async for res in uart_aloader:
         print("Received:", res)
 ```
+#### [Contents](./README.md#0-contents)  
+
 # 8. Exceptions
 
 These are defined in `umsgpack/__init__.py`.
@@ -477,6 +525,7 @@ class UnhashableKeyException(UnpackException):
 class DuplicateKeyException(UnpackException):
     "Duplicate key encountered during map unpacking."
 ```
+#### [Contents](./README.md#0-contents)  
 
 # 9. Test suite
 
@@ -490,6 +539,7 @@ issue:
 ```bash
 $ python3 test_umsgpack.py
 ```
+#### [Contents](./README.md#0-contents)  
 
 # 10. Changes for MicroPython
 
@@ -513,6 +563,8 @@ Many functions refactored to save bytes.
 `InvalidString` class removed because it is a subclass of a native type.  
 Method of detecting platform's float size changed (MicroPython does not support
 the original method).  
+
+#### [Contents](./README.md#0-contents)  
 
 # 11. Notes on extension classes
 
@@ -574,6 +626,8 @@ they can convert between the supported data type and one natively supported,
 and use `umsgpack` itself. See `mpk_set.py` which converts a `set` to a `list`
 and _vice versa_.
 
+#### [Contents](./README.md#0-contents)  
+
 # 12. Measurement of RAM usage
 
 This test used an RP2040 with precompiled code in romfs. In each case the code
@@ -601,14 +655,16 @@ print(a-b)
 ```
 Results were pack: 2192 bytes, unpack 1008 bytes.
 
-## Acknowledgements
+#### [Contents](./README.md#0-contents)  
+
+# 13. Acknowledgements
 
 This project was inspired by
 [this forum thread](https://forum.micropython.org/viewtopic.php?f=15&t=10827)
 where user WZab performed an initial port of the source library. See also
 [this GitHub issue](https://github.com/micropython/micropython/issues/4241).
 
-## Summary of references
+# 14. References
 
 MessagePack main site:  
 [MessagePack](http://msgpack.org/)  
@@ -617,7 +673,7 @@ MessagePack spec:
 Code on which this repo is based:  
 [u-msgpack-python](https://github.com/vsergeev/u-msgpack-python).
 
-## License
+# 16. Licence
 
-micropython-msgpack is MIT licensed. See the included `LICENSE` file for more
+micropython-msgpack is MIT licenced. See the included `LICENSE` file for more
 details.
