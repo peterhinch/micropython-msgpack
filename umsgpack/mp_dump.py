@@ -7,7 +7,6 @@
 # See __init__.py for details of changes made for MicroPython.
 
 import struct
-from collections import OrderedDict
 import io
 from . import *
 
@@ -216,7 +215,7 @@ def mpdump(obj, fp, options):
     if isinstance(obj, (list, tuple)):
         _pack_array(obj, fp, options)
         return
-    if isinstance(obj, (dict, OrderedDict)):
+    if isinstance(obj, dict):
         _pack_map(obj, fp, options)
         return
 

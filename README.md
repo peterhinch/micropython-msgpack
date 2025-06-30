@@ -1,6 +1,6 @@
 # MicroPython MessagePack
 
-An efficient drop-in binary alternative to JSON. 
+An efficient drop-in binary alternative to JSON.
 
 # 0. Contents
 
@@ -274,8 +274,8 @@ case being exchanging data with non-Python targets.
  call. This could be used, for example, to calculate a CRC value on the received
  message data.
 
-Work is in progress to make `dict` instances ordered by default, so option 2
-may become pointless.
+Work is [in progress](https://github.com/micropython/micropython/issues/6170) to
+make `dict` instances ordered by default, so option 2 may become pointless.
 
 ## 4.2 Dump options
 
@@ -304,6 +304,8 @@ following types are supported:
 `tuple` and `list` data types to be preserved.
 * `bytearray` By default a `bytearray` decodes as a `bytes` object. This module
 remedies this.
+* `OrderedDict` By default an `OrderedDict` decodes as a `dict`. This module
+preserves it as a separate type.
 
 The following enables support for `byterray`, `set`, `complex` and `tuple` and
 illustrates saving and restoring a `set`.
@@ -336,7 +338,10 @@ print(z)
 # 6 Extending umsgpack
 
 This is done via the `ext_serializable` decorator which is used in two ways: to
-create serialisable user classes and to support additional built-in types.
+create serialisable user classes and to support additional built-in types. Each
+extension type is assigned an `ext_type` value which, to the application code,
+must be unique. Please treat values `0x50` to `0x5F` as reserved for built-in
+types supported by this library (current and future).
 
 ## 6.1 Serialisable user classes
 
@@ -630,6 +635,16 @@ Typically `packb` and `unpackb` use the `struct` module, but in simple cases
 they can convert between the supported data type and one natively supported,
 and use `umsgpack` itself. See `mpk_set.py` which converts a `set` to a `list`
 and _vice versa_.
+
+Currently supported extension types:
+| ext_type  | Type        | Support File     |
+|:----------|:------------|:-----------------|
+| 0x50      | complex     | mpk_complex.py   |
+| 0x51      | set         | mpk_set.py       |
+| 0x52      | tuple       | mpk_tuple.py     |
+| 0x53      | bytearray   | mpk_bytearray.py |
+| 0x54      | OrderedDict | mpk_odict.py     |
+| 0x55-0x5F | Reserved    | future use       |              
 
 #### [Contents](./README.md#0-contents)  
 

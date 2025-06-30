@@ -8,6 +8,7 @@
     ["umsgpack/mpk_complex.py", "github:peterhinch/micropython-msgpack/umsgpack/mpk_complex.py"],
     ["umsgpack/mpk_set.py", "github:peterhinch/micropython-msgpack/umsgpack/mpk_set.py"],
     ["umsgpack/mpk_tuple.py", "github:peterhinch/micropython-msgpack/umsgpack/mpk_tuple.py"],
+    ["umsgpack/mpk_odict.py", "github:peterhinch/micropython-msgpack/umsgpack/mpk_odict.py"],
     ["asyntest.py", "github:peterhinch/micropython-msgpack/asyntest.py"],
     ["user_class.py", "github:peterhinch/micropython-msgpack/user_class.py"]
   ],
