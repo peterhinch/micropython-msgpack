@@ -24,7 +24,23 @@
 # Method of detecting platform's float size changed.
 # Version reset to (0.1.0).
 
-__version__ = (0, 2, 0)
+__version__ = (0, 2, 1)
+# Workround for MicroPython regression where from . import * caused AttributeError
+__all__ = [
+    "ext_serializable",
+    "float_precision",
+    "custom",
+    "builtins",
+    "packers",
+    "PackException",
+    "UnpackException",
+    "UnsupportedTypeException",
+    "InsufficientDataException",
+    "InvalidStringException",
+    "ReservedCodeException",
+    "UnhashableKeyException",
+    "DuplicateKeyException",
+]
 
 # Auto-detect system float precision
 float_precision = "single" if len(str(1 / 3)) < 13 else "double"
