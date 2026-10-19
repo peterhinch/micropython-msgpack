@@ -178,6 +178,10 @@ This MicroPython version uses various techniques to minimise RAM use including
 application that only de-serialises data using synchronous code will not import
 code to dump data or that to support asynchronous programming.
 
+There is now an [implementation in C](https://github.com/Tangerino/micropython-msgpackc)
+by Carlos Tangerino which has the same API while being much faster and using
+less RAM. Firmware must be compiled to include the code.
+
 # 2.1 Inter-operation
 
 The un-extended module conforms to the MessagePack specification. Consequently
